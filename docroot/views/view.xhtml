@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+
+<f:view
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:ui="http://java.sun.com/jsf/facelets">
+	<h:head />
+	<h:body>
+
+
+	
+	<h:panelGroup layout="block" id="uploadTopContentLineShade" styleClass="topLineShade"> 
+   		<h:outputText styleClass="TitleLine" value="ICM Electrocardiograph Tool Kit: Upload" />
+   	</h:panelGroup>
+	
+	<f:event type="preRenderView" listener="#{fileUploadBacking.init}" />
+	
+	<h:panelGroup layout="block" styleClass="backgroundofContent">
+ 		<p:layout style=" height:550px; top:20px;" id="layoutUpload">
+			<p:layoutUnit position="center" styleClass="layout-main">
+				<h:form id="formUpload" enctype="multipart/form-data" style="height:555">
+    				
+    				<p:panel id="panel" header="Select Folder to Upload Files Into" styleClass="tree-panel">
+                              
+                        <p:panelGrid id="buttonGrid" columns="3" style="border:0;" >
+                            <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
+                            <p:commandButton style=" font-family: helvetica;font-size:8pt;" id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
+                        </p:panelGrid>              
+
+                        <p:tree id="fileTree" style="float:left;border:0;"
+							cache="true"
+							dynamic="true"
+							selection="#{fileUploadBacking.fileTree.selectedNode}" 
+							selectionMode="single"
+							value="#{fileUploadBacking.fileTree.treeRoot}" 
+							var="node">
+							
+								<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" />
+							                            
+        						<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed" >  
+            						<h:outputText value="#{node}"/>  
+        						</p:treeNode> 
+    					</p:tree>  
+					</p:panel> 
+      
+					<p:panel id="fileUploadPanel" header="Select files form your computer to upload and save" styleClass="upload-panel">    
+                    
+                   		<p:fileUpload id="uploader" style="float:right; width:100%!important;"
+                        	allowTypes="/(\.|\/)(hea|dat|xyz)$/"
+        	                value="Facts" 
+        	                multiple="true"
+      	                  	uploadLabel="Upload All"
+            	            cancelLabel="Remove All" 
+            	            auto="false"
+                	        widgetVar="waveformFileUpload"
+                    	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
+                        	description="Select Images" 
+                        	update="fileTree"/>          
+                 	</p:panel>  
+       			</h:form>
+          </p:layoutUnit>
+		</p:layout>
+</h:panelGroup>
+
+
+	</h:body>
+</f:view>
