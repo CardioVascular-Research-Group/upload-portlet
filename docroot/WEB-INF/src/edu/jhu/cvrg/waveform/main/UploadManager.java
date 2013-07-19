@@ -19,6 +19,7 @@ limitations under the License.
 * 
 */
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -27,12 +28,28 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Random;
+import java.util.Scanner;
+
+import org.jdom.Document;
+import org.jdom.JDOMException;
+import org.jdom.filter.ElementFilter;
+import org.jdom.input.SAXBuilder;
+import org.jdom.output.XMLOutputter;
+import org.sierraecg.DecodedLead;
+import org.sierraecg.SierraEcgFiles;
+import org.sierraecg.schema.Generalpatientdata;
+import org.sierraecg.schema.Restingecgdata;
+import org.sierraecg.schema.Signalcharacteristics;
 
 import com.liferay.portal.model.User;
 
@@ -42,7 +59,6 @@ import edu.jhu.cvrg.waveform.utility.EnumFileType;
 import edu.jhu.cvrg.waveform.utility.FTPUtility;
 import edu.jhu.cvrg.waveform.utility.MetaContainer;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
-import edu.jhu.cvrg.waveform.utility.StudyEntryUtility;
 import edu.jhu.cvrg.waveform.utility.UploadUtility;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 
@@ -53,8 +69,11 @@ public class UploadManager {
 	private MetaContainer metaData = new MetaContainer();
 	private String tempHeaderFile = "";
 	private User user;
+	EnumFileType fileType;
+	Restingecgdata philipsECG;
+	DecodedLead[] leadData;
  
-	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath) {
+	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath, String characterEncoding) throws UploadFailureException {
 
 		metaData.setFileName(fileName);
 		metaData.setStudyID(studyID);
@@ -63,9 +82,40 @@ public class UploadManager {
 
 		user = ResourceUtility.getCurrentUser();
 
-		File file =	saveFileToTemp(fileToSave, fileSize);
-			
-			try {
+		try {
+		
+				fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
+				if(fileType == EnumFileType.XML) {
+					String xmlString = "";
+					if(characterEncoding == null) {
+						characterEncoding = "UTF-8";
+					}
+					xmlString = convertStreamToString(fileToSave, characterEncoding);
+					
+					// clear out the first two characters, then make sure that the string is still valid XML
+					// when parsing out an input stream, it seems that there are two invalid characters at the beginning.
+					Document philipsJdom = build(xmlString);
+					ElementFilter restingEcgDataTag = new ElementFilter("restingecgdata");
+						
+					List results = philipsJdom.getContent(restingEcgDataTag);
+						
+					// if true, this indicates that it is a Philips XML
+					// not sure why, but in the resulting string, every word has a space in between it
+					if(!(results.isEmpty())) {
+						fileType = EnumFileType.PHIL;
+							
+						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
+						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
+						
+						
+						fileToSave = new ByteArrayInputStream(xmlString.getBytes(characterEncoding));
+					}
+						
+					
+				}
+		
+				File file =	saveFileToTemp(fileToSave, fileSize);
+				
 				String userId = user.getScreenName();
 				if(userId == null || userId.equals("")){
 					userId = user.getEmailAddress();
@@ -77,8 +127,13 @@ public class UploadManager {
 //				stageUploadedFile(outputDirectory, userId, false);
 	
 				convertUploadedFile(outputDirectory, userId, false);
+				
+				if(fileType == EnumFileType.PHIL) {
+					this.setPhilipsAnnotations();
+				}
 			} catch (Exception e) {
 				e.printStackTrace();
+				throw new UploadFailureException("This upload failed because:  " + e.getMessage());
 			}	
 
 	}
@@ -113,6 +168,20 @@ public class UploadManager {
 				metaData.setSubjectID(metaData.getFileName().substring(0, location));
 			} else {
 				metaData.setSubjectID(metaData.getFileName());
+			}
+			
+			if(fileType == EnumFileType.PHIL) {
+				philipsECG = SierraEcgFiles.preprocess(targetFile);
+				leadData = SierraEcgFiles.extractLeads(targetFile);
+				Signalcharacteristics signalMetaData = philipsECG.getDataacquisition().getSignalcharacteristics();
+				
+				metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
+				metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
+				metaData.setNumberOfPoints(leadData[0].size());
+				
+//				Generalpatientdata otherMetaData = philipsECG.getPatient().getGeneralpatientdata();
+//				metaData.setSubjectAge(otherMetaData.getAge().getYears());
+//				metaData.setSubjectGender(otherMetaData.getSex().value());
 			}
 			
 			return targetFile;
@@ -164,52 +233,17 @@ public class UploadManager {
 		return outputDir;
 	}
 
-	private void stageUploadedFile(String outputDirectory, String uId, boolean isPublic) {
-		
-		if(ResourceUtility.getFtpHost().equals("0") ||
-				ResourceUtility.getFtpUser().equals("0") ||
-				ResourceUtility.getFtpPassword().equals("0")){
-			
-			System.out.println("Missing FTP Configuration.  Cannot run Node Staging Web Service.");
-			return;		
-		}
-		
-		if(ResourceUtility.getStagingServiceMethod().equals("0") || ResourceUtility.getStagingService().equals("0")){
-			System.out.println("Missing Web Service Configuration.  Cannot run Node Staging Web Service.");
-			return;	
-		}
-
-		LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
-
-		parameterMap.put("userid", uId);
-		parameterMap.put("subjectid", metaData.getSubjectID());
-		parameterMap.put("filename", outputDirectory + "/" + metaData.getFileName());
-		parameterMap.put("ftphost", ResourceUtility.getFtpHost());
-		parameterMap.put("ftpuser", ResourceUtility.getFtpUser());
-		parameterMap.put("ftppassword", ResourceUtility.getFtpPassword());
-		parameterMap.put("service", "DataStaging");
-		parameterMap.put("logindatetime",	new Long(System.currentTimeMillis()).toString());
-		parameterMap.put("publicprivatefolder", String.valueOf(isPublic));
-
-		String pubPriv = "private";
-
-		if (isPublic) {
-			pubPriv = "public";
-		}
-
-		metaData.setFullFilePath(ResourceUtility.getFtpRoot() + "/" + uId + "/"	+ pubPriv + "/" + metaData.getSubjectID() + "/input/");
-		metaData.setUserID(uId);
-
-		WebServiceUtility.callWebService(parameterMap, isPublic, ResourceUtility.getStagingServiceMethod(), ResourceUtility.getStagingService(), null);
-	}
- 
 	private void convertUploadedFile(String outputDirectory, String uId, boolean isPublic) throws UploadFailureException {
 
 			String method = "na";
-			String outfilename = outputDirectory + File.separator + metaData.getFileName();
+			String outfilename = ""; 
+			if(File.separator.equals("\\")) {
+				outfilename = outputDirectory + "//" + metaData.getFileName();
+			}
+			else {
+				outfilename = outputDirectory + File.separator + metaData.getFileName();
+			}
 			boolean correctFormat = true;
-
-			EnumFileType fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
 
 			switch (fileType) {
 			case RDT:	method = "rdtToWFDB16";					break;
@@ -222,6 +256,7 @@ public class UploadManager {
 			case NAT:	method = "na";							break;
 			case GTM:	method = "na";							break;
 			case XML:	method = "hL7";							break;
+			case PHIL:	method = "philipsToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML);		break;
 			default:	method = "geMuse";						break;
 			}
 			
@@ -274,6 +309,8 @@ public class UploadManager {
 				
 				WebServiceUtility.callWebService(parameterMap, isPublic, method, ResourceUtility.getNodeConversionService(), null);
 			}
+			
+			// create an instance of the Sierra ECG Parser to get the remaining bits of metadata required
 			
 			UploadUtility utility = new UploadUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
 					com.liferay.util.portlet.PortletProps.get("dbPassword"), 
@@ -470,6 +507,65 @@ public class UploadManager {
 		metaData.setDate(month + "/" + day + "/" + year);
 
 		return date + time;
+	}
+	
+	private void setPhilipsAnnotations() {
+		
+	}
+	
+	/**
+	 * Helper method to build a <code>jdom.org.Document</code> from an 
+	 * XML document represented as a String
+	 * @param  xmlDocAsString  <code>String</code> representation of an XML
+	 *         document with a document declaration.
+	 *         e.g., <?xml version="1.0" encoding="UTF-8"?>
+	 *                  <root><stuff>Some stuff</stuff></root>
+	 * @return Document from an XML document represented as a String
+	 */
+	private static Document build(String xmlDocAsString) 
+	        throws JDOMException {
+		Document doc = null;
+	    SAXBuilder builder = new SAXBuilder();
+	    Reader stringreader = new StringReader(xmlDocAsString);
+	    try {
+	    	doc = builder.build(stringreader);
+	    } catch(IOException ioex) {
+	    	ioex.printStackTrace();
+	    }
+	    return doc;
+	}
+
+
+	/**
+	 * Helper method to generate a String output of a
+	 * <code>org.jdom.Document</code>
+	 * @param  xmlDoc  Document XML document to be converted to String
+	 * @return <code>String</code> representation of an XML
+	 *         document with a document declaration.
+	 *         e.g., <?xml version="1.0" encoding="UTF-8"?>
+	 *                  <root><stuff>Some stuff</stuff></root>
+	 */
+	private static String getString(Document xmlDoc) 
+	        throws JDOMException {
+	    try {
+	         XMLOutputter xmlOut = new XMLOutputter();
+	         StringWriter stringwriter = new StringWriter();
+	         xmlOut.output(xmlDoc, stringwriter);
+	
+	         return stringwriter.toString();
+	    } catch (Exception ex) {
+	        throw new JDOMException("Error converting Document to String"
+	                + ex);
+	    }
+	}
+	
+	private static String convertStreamToString(InputStream is, String encoding) {
+	    Scanner inputScan = new Scanner(is, encoding).useDelimiter("\\A");
+	    if(inputScan.hasNext()) {
+	    	return inputScan.next();
+	    }
+	    
+	    return "";
 	}
 	
 }

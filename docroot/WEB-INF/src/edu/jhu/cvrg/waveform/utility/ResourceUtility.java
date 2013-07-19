@@ -52,9 +52,7 @@ public class ResourceUtility {
 	}
 	
 	public static String getStagingFolder(){
-		LiferayFacesContext liferayFacesContext = LiferayFacesContext.getInstance();
-		PortletPreferences prefs = liferayFacesContext.getPortletPreferences();
-		return prefs.getValue("stagingFolder", "0");
+		return com.liferay.util.portlet.PortletProps.get("stagingFolder");
 	}
 
 	public static String getAnalysisServiceURL(){

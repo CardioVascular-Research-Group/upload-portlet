@@ -33,6 +33,7 @@ import org.primefaces.event.NodeSelectEvent;
 
 import com.liferay.portal.model.User;
 
+import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.main.UploadManager;
 import edu.jhu.cvrg.waveform.model.FileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
@@ -78,11 +79,19 @@ public class FileUploadBacking implements Serializable{
 			String fileName = event.getFile().getFileName();
 			long fileSize = event.getFile().getSize();
 
-			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectedNodePath());
+			// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
+			// the function will use UTF-8 by default
+			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectedNodePath(), "UTF-16");
 			msg = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
 			e.printStackTrace();
-			msg = new FacesMessage("Failure", event.getFile().getFileName() + " failed to upload.");
+			msg = new FacesMessage("Failure", event.getFile().getFileName() + " failed to upload.  Could not read file.");
+		} catch (UploadFailureException ufe) {
+			ufe.printStackTrace();
+			msg = new FacesMessage("Failure", "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			msg = new FacesMessage("Failure", "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
 		}
 		
 		fileTree.initialize(user.getScreenName());

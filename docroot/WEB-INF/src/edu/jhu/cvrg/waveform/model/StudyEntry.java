@@ -91,6 +91,11 @@ public class StudyEntry implements Serializable{
 	public static final int XY_FILE = 8;
 	
 	/**
+	 * Indicates a Philips XML file
+	 */
+	public static final int PHILIPSXML = 9;
+	
+	/**
 	 * 	
 	 * public StudyEntry(String newStudy, String newSubject, String newDataType, String newDate)
 	 * 

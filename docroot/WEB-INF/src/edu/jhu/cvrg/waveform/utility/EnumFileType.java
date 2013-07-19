@@ -20,7 +20,7 @@ limitations under the License.
 */
 public enum EnumFileType {
 	
-	RDT, XYZ, DAT, HEA, ZIP, TXT, CSV, NAT, GTM, XML
+	RDT, XYZ, DAT, HEA, ZIP, TXT, CSV, NAT, GTM, XML, HL7, PHIL, MUSE
 	
 }
 

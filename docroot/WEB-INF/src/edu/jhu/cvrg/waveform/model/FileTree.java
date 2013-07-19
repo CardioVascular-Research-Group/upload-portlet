@@ -118,11 +118,12 @@ public class FileTree implements Serializable{
 
 	public void addFolder(ActionEvent event) {
 		
-		System.out.println("Selected node " + selectedNode.getData().toString());
 		
 		if (selectedNode == null) {
 			selectedNode = (FileNode) treeRoot;
 		}
+		
+		System.out.println("Selected node " + selectedNode.getData().toString());
 
 		if (!newFolderName.equals("")) {
 			TreeNode newNode = new FileNode(newFolderName, selectedNode, true, null);

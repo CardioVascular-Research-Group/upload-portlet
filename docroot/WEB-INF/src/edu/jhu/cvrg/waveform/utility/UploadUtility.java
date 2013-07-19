@@ -279,6 +279,20 @@ public class UploadUtility extends XMLUtility {
 
 		newEntry.addFile(newFile);
 		
+		if(metaData.getFileFormat() != StudyEntry.WFDB_DATA && metaData.getFileFormat() != StudyEntry.WFDB_HEADER) {
+			String fileNameNoExt = metaData.getFileName();
+			fileNameNoExt = fileNameNoExt.substring(0, fileNameNoExt.lastIndexOf("."));
+			
+			FileDetails additionalDatFile = new FileDetails();
+			FileDetails additionalHeaFile = new FileDetails();
+			
+			additionalDatFile.setFileLocation(metaData.getFullFilePath() + fileNameNoExt + ".dat");
+			additionalHeaFile.setFileLocation(metaData.getFullFilePath() + fileNameNoExt + ".hea");
+			
+			newEntry.addFile(additionalDatFile);
+			newEntry.addFile(additionalHeaFile);
+		}
+		
 		//System.out.println("\n" + newEntry.toString() + "\n");
 		
 		System.out.println("Finished createStudyEntryXML");
