@@ -26,13 +26,15 @@ import java.io.IOException;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 
+import edu.jhu.cvrg.waveform.exception.UploadFailureException;
+
 public class FTPUtility {
 	
 	private static FTPClient client = new FTPClient();
 	
 	private FTPUtility(){}
 
-	public static void uploadToRemote(String outputdir, File file) {
+	public static void uploadToRemote(String outputdir, File file) throws UploadFailureException {
 
 		try {
 			FileInputStream inputStream = new FileInputStream(file);		
@@ -46,6 +48,8 @@ public class FTPUtility {
 	        
 	        if(inputStream.available() > 0){
 	        	System.out.println("File upload failed.");
+	        	inputStream.close();
+	        	throw new UploadFailureException("Unable to upload the file to the remote location");
 	        }
 	        
 	        inputStream.close();

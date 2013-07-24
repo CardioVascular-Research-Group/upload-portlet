@@ -195,7 +195,7 @@ public class UploadManager {
 		return null;
 	}
 
-	private String uploadFileFtp(String userId, File file) {
+	private String uploadFileFtp(String userId, File file) throws UploadFailureException {
 
 		String outputDir = "";
 		String targetSubjectId = "";
@@ -241,7 +241,7 @@ public class UploadManager {
 				outfilename = outputDirectory + "//" + metaData.getFileName();
 			}
 			else {
-				outfilename = outputDirectory + File.separator + metaData.getFileName();
+				outfilename = outputDirectory + File.separator + File.separator + metaData.getFileName();
 			}
 			boolean correctFormat = true;
 
