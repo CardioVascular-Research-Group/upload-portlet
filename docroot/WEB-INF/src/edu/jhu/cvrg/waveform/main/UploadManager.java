@@ -256,7 +256,7 @@ public class UploadManager {
 			case NAT:	method = "na";							break;
 			case GTM:	method = "na";							break;
 			case XML:	method = "hL7";							break;
-			case PHIL:	method = "philipsToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML);		break;
+			case PHIL:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
 			default:	method = "geMuse";						break;
 			}
 			

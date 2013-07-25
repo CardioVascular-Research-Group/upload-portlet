@@ -38,9 +38,6 @@ public class FTPUtility {
 
 		try {
 			FileInputStream inputStream = new FileInputStream(file);	
-			System.out.println(ResourceUtility.getFtpHost());
-			System.out.println(ResourceUtility.getFtpUser());
-			System.out.println(ResourceUtility.getFtpPassword());
 			client.connect(ResourceUtility.getFtpHost());		
 	        client.login(ResourceUtility.getFtpUser(), ResourceUtility.getFtpPassword());
 	        client.enterLocalPassiveMode();

@@ -91,9 +91,19 @@ public class StudyEntry implements Serializable{
 	public static final int XY_FILE = 8;
 	
 	/**
-	 * Indicates a Philips XML file
+	 * Indicates a Philips 1.03 XML file
 	 */
-	public static final int PHILIPSXML = 9;
+	public static final int PHILIPSXML103 = 9;
+	
+	/**
+	 * Indicates a Philips 1.03 XML file
+	 */
+	public static final int PHILIPSXML104 = 10;
+	
+	/**
+	 * Indicates a GeMUSE 8 XML file
+	 */
+	public static final int MUSEXML = 11;
 	
 	/**
 	 * 	
