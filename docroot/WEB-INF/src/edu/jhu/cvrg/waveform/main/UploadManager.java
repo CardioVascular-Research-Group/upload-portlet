@@ -102,7 +102,7 @@ public class UploadManager {
 					// if true, this indicates that it is a Philips XML
 					// not sure why, but in the resulting string, every word has a space in between it
 					if(!(results.isEmpty())) {
-						fileType = EnumFileType.PHIL;
+						fileType = EnumFileType.PHIL103;
 							
 						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
 						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
@@ -128,7 +128,7 @@ public class UploadManager {
 	
 				convertUploadedFile(outputDirectory, userId, false);
 				
-				if(fileType == EnumFileType.PHIL) {
+				if(fileType == EnumFileType.PHIL103) {
 					this.setPhilipsAnnotations();
 				}
 			} catch (Exception e) {
@@ -170,7 +170,7 @@ public class UploadManager {
 				metaData.setSubjectID(metaData.getFileName());
 			}
 			
-			if(fileType == EnumFileType.PHIL) {
+			if(fileType == EnumFileType.PHIL103) {
 				philipsECG = SierraEcgFiles.preprocess(targetFile);
 				leadData = SierraEcgFiles.extractLeads(targetFile);
 				Signalcharacteristics signalMetaData = philipsECG.getDataacquisition().getSignalcharacteristics();
@@ -256,7 +256,7 @@ public class UploadManager {
 			case NAT:	method = "na";							break;
 			case GTM:	method = "na";							break;
 			case XML:	method = "hL7";							break;
-			case PHIL:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
+			case PHIL103:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
 			default:	method = "geMuse";						break;
 			}
 			
