@@ -24,6 +24,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -39,17 +40,28 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Iterator;
+
+import javax.xml.bind.JAXBException;
 
 import org.jdom.Document;
+import org.jdom.Element;
 import org.jdom.JDOMException;
+import org.jdom.Namespace;
 import org.jdom.filter.ElementFilter;
 import org.jdom.input.SAXBuilder;
 import org.jdom.output.XMLOutputter;
+
+// This is for Philips 1.03 format
 import org.sierraecg.DecodedLead;
 import org.sierraecg.SierraEcgFiles;
 import org.sierraecg.schema.Generalpatientdata;
 import org.sierraecg.schema.Restingecgdata;
 import org.sierraecg.schema.Signalcharacteristics;
+
+// This is for Philips 1.04 format
+import org.cvrgrid.philips.*;
+import org.cvrgrid.philips.jaxb.schema.*;
 
 import com.liferay.portal.model.User;
 
@@ -70,8 +82,15 @@ public class UploadManager {
 	private String tempHeaderFile = "";
 	private User user;
 	EnumFileType fileType;
-	Restingecgdata philipsECG;
-	DecodedLead[] leadData;
+	Document xmlJdom;
+	
+	// For Philips 1.03 format
+	org.sierraecg.schema.Restingecgdata philipsECG103;
+	org.sierraecg.DecodedLead[] leadData103;
+	
+	// For Philips 1.04 format
+	org.cvrgrid.philips.jaxb.beans.Restingecgdata philipsECG104;
+	org.cvrgrid.philips.DecodedLead[] leadData104;
  
 	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath, String characterEncoding) throws UploadFailureException {
 
@@ -85,36 +104,67 @@ public class UploadManager {
 		try {
 		
 				fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
+				
+				File tempFile =	saveFileToTemp(fileToSave, fileSize);
+				
 				if(fileType == EnumFileType.XML) {
 					String xmlString = "";
-					if(characterEncoding == null) {
-						characterEncoding = "UTF-8";
-					}
-					xmlString = convertStreamToString(fileToSave, characterEncoding);
 					
-					// clear out the first two characters, then make sure that the string is still valid XML
-					// when parsing out an input stream, it seems that there are two invalid characters at the beginning.
-					Document philipsJdom = build(xmlString);
-					ElementFilter restingEcgDataTag = new ElementFilter("restingecgdata");
+					BufferedReader xmlBuf = new BufferedReader(new FileReader(tempFile));
+					String line = xmlBuf.readLine();
+					
+					while(line != null) {			
+						if(!(line.contains("!DOCTYPE"))) {
+							xmlString = xmlString + line;
+						}
+						line = xmlBuf.readLine();
+					}
+					
+					xmlBuf.close();
+					xmlJdom = build(xmlString);
+					
+					// indicates one of the Philips formats
+					if(xmlString.contains("restingecgdata")) {
+						Element restingEcgDataTag = xmlJdom.getRootElement();
+						Namespace ns = Namespace.getNamespace("http://www3.medical.philips.com");
+						Element docInfo = restingEcgDataTag.getChild("documentinfo", ns);
 						
-					List results = philipsJdom.getContent(restingEcgDataTag);
-						
-					// if true, this indicates that it is a Philips XML
-					// not sure why, but in the resulting string, every word has a space in between it
-					if(!(results.isEmpty())) {
-						fileType = EnumFileType.PHIL103;
+						if(docInfo != null) {
+							Element docVersion = docInfo.getChild("documentversion", ns);
+							if(docVersion != null && docVersion.getText().equals("1.03")) {
+								fileType = EnumFileType.PHIL103;
+								extractPhilips103Data(tempFile);
+							}
+							else if(docVersion != null && docVersion.getText().equals("1.04")) {
+								fileType = EnumFileType.PHIL104;
+								extractPhilips104Data(tempFile);
+							}
+							else {
+								throw new UploadFailureException("Unrecognized version number for Philips file");
+							}
 							
+							//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
+							// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
+							
+						}
+						else {
+							throw new UploadFailureException("This Philips file has no document version information");
+						}
+					}
+					// indicates GE Muse 8
+					else if(xmlString.contains("RestingECG")) {
 						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
 						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
 						
-						
-						fileToSave = new ByteArrayInputStream(xmlString.getBytes(characterEncoding));
-					}
-						
+						fileType = EnumFileType.MUSEXML;
+						extractMuseXMLData();
+					}						
 					
 				}
-		
-				File file =	saveFileToTemp(fileToSave, fileSize);
+				
+				if(fileType == EnumFileType.PHIL103) {
+
+				}
 				
 				String userId = user.getScreenName();
 				if(userId == null || userId.equals("")){
@@ -122,18 +172,13 @@ public class UploadManager {
 				}
 				metaData.setUserID(userId);
 				
-				String outputDirectory = uploadFileFtp(userId, file);
-	
-//				stageUploadedFile(outputDirectory, userId, false);
+				String outputDirectory = uploadFileFtp(userId, tempFile);
 	
 				convertUploadedFile(outputDirectory, userId, false);
-				
-				if(fileType == EnumFileType.PHIL103) {
-					this.setPhilipsAnnotations();
-				}
+
 			} catch (Exception e) {
 				e.printStackTrace();
-				throw new UploadFailureException("This upload failed because:  " + e.getMessage());
+				throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
 			}	
 
 	}
@@ -168,20 +213,6 @@ public class UploadManager {
 				metaData.setSubjectID(metaData.getFileName().substring(0, location));
 			} else {
 				metaData.setSubjectID(metaData.getFileName());
-			}
-			
-			if(fileType == EnumFileType.PHIL103) {
-				philipsECG = SierraEcgFiles.preprocess(targetFile);
-				leadData = SierraEcgFiles.extractLeads(targetFile);
-				Signalcharacteristics signalMetaData = philipsECG.getDataacquisition().getSignalcharacteristics();
-				
-				metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
-				metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
-				metaData.setNumberOfPoints(leadData[0].size());
-				
-//				Generalpatientdata otherMetaData = philipsECG.getPatient().getGeneralpatientdata();
-//				metaData.setSubjectAge(otherMetaData.getAge().getYears());
-//				metaData.setSubjectGender(otherMetaData.getSex().value());
 			}
 			
 			return targetFile;
@@ -251,12 +282,14 @@ public class UploadManager {
 			case DAT:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
 			case HEA:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_HEADER);		break;
 			case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ 				break;
-			case TXT:	method = evaluateTextFile(outfilename);	/* will eventually process GE MUSE*/	break;
+			case TXT:	method = evaluateTextFile(outfilename);	/* will eventually process GE MUSE Text files*/	break;
 			case CSV:	method = "xyFile";						break;
 			case NAT:	method = "na";							break;
 			case GTM:	method = "na";							break;
 			case XML:	method = "hL7";							break;
 			case PHIL103:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
+			case PHIL104:	method = "philips104ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML104);		break;
+			case MUSEXML:	method = "museXML";	metaData.setFileFormat(StudyEntry.MUSEXML);		break;
 			default:	method = "geMuse";						break;
 			}
 			
@@ -309,8 +342,6 @@ public class UploadManager {
 				
 				WebServiceUtility.callWebService(parameterMap, isPublic, method, ResourceUtility.getNodeConversionService(), null);
 			}
-			
-			// create an instance of the Sierra ECG Parser to get the remaining bits of metadata required
 			
 			UploadUtility utility = new UploadUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
 					com.liferay.util.portlet.PortletProps.get("dbPassword"), 
@@ -413,7 +444,7 @@ public class UploadManager {
 		    		}		
 		    	}
 		    }
-		    else {//This is an improperly formed header file.  There should be at least two fields, separated by spaces
+		    else {  //This is an improperly formed header file.  There should be at least two fields, separated by spaces
 		    	returnValue = false;
 		    }
 		    
@@ -509,9 +540,76 @@ public class UploadManager {
 		return date + time;
 	}
 	
-	private void setPhilipsAnnotations() {
+	// Unfortunately, the two different data structures for Philips are not interchangeable.  Since the underlying 
+	// schema is different, different beans are used to house the structure.  So while similar on the surface, under
+	// the hood they are organized differently.
+	private void extractPhilips103Data(File file) throws IOException, JAXBException {
+		philipsECG103 = SierraEcgFiles.preprocess(file);
+		leadData103 = SierraEcgFiles.extractLeads(file);
+		Signalcharacteristics signalMetaData = philipsECG103.getDataacquisition().getSignalcharacteristics();
 		
+		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
+		metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
+		metaData.setNumberOfPoints(leadData103[0].size());
+		
+		// delete ECG data structures to free up memory
+		philipsECG103 = null;
+		leadData103 = null;
+		xmlJdom = null;
 	}
+	
+	private void extractPhilips104Data(File file) throws IOException, JAXBException {
+		philipsECG104 = org.cvrgrid.philips.SierraEcgFiles.preprocess(file);
+		leadData104 = org.cvrgrid.philips.SierraEcgFiles.extractLeads(file);
+		org.cvrgrid.philips.jaxb.beans.Signalcharacteristics signalMetaData = philipsECG104.getDataacquisition().getSignalcharacteristics();
+		
+		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
+		metaData.setChannels(signalMetaData.getNumberchannelsallocated().intValue());  // Method returns a BigInteger, so a conversion to int is required.
+		metaData.setNumberOfPoints(leadData104[0].size());
+		
+		// delete ECG data structures to free up memory
+		philipsECG104 = null;
+		leadData104 = null;
+		xmlJdom = null;
+	}
+	
+	private void extractMuseXMLData() {
+		Element rootElement = xmlJdom.getRootElement();
+		List waveformElements = rootElement.getChildren("Waveform");
+		
+		// Since the DTD was unable to be found, the XML had to be traversed one level at a time
+		if(!(waveformElements.isEmpty())) {
+			Iterator waveformIter = waveformElements.iterator();
+			while(waveformIter.hasNext()) {
+				Element nextWaveform = (Element)waveformIter.next();
+				Element waveformType = nextWaveform.getChild("WaveformType");
+				
+				// Check to make sure there are valid waveforms, then get each WaveFormData tag, which is a child of a LeadData tag
+				if((waveformType != null) && (waveformType.getText().equals("Rhythm"))) {
+					
+					// get the Sampling Rate of the waveform in the process
+					metaData.setSampFrequency(Float.valueOf(nextWaveform.getChild("SampleBase").getText()));
+					
+					List leadDataList = nextWaveform.getChildren("LeadData");
+					
+					if(!(leadDataList.isEmpty())) {
+						metaData.setChannels(leadDataList.size());
+						
+						Iterator leadIter = leadDataList.iterator();
+						
+						Element leadData = (Element)leadIter.next();
+						Element sampleCount = leadData.getChild("LeadSampleCountTotal");
+							
+						metaData.setNumberOfPoints(Integer.valueOf(sampleCount.getText()));
+					}
+				}
+			}
+		}
+		
+		// delete JDOM object to free up memory
+		xmlJdom = null;
+	}
+	
 	
 	/**
 	 * Helper method to build a <code>jdom.org.Document</code> from an 
@@ -533,39 +631,6 @@ public class UploadManager {
 	    	ioex.printStackTrace();
 	    }
 	    return doc;
-	}
-
-
-	/**
-	 * Helper method to generate a String output of a
-	 * <code>org.jdom.Document</code>
-	 * @param  xmlDoc  Document XML document to be converted to String
-	 * @return <code>String</code> representation of an XML
-	 *         document with a document declaration.
-	 *         e.g., <?xml version="1.0" encoding="UTF-8"?>
-	 *                  <root><stuff>Some stuff</stuff></root>
-	 */
-	private static String getString(Document xmlDoc) 
-	        throws JDOMException {
-	    try {
-	         XMLOutputter xmlOut = new XMLOutputter();
-	         StringWriter stringwriter = new StringWriter();
-	         xmlOut.output(xmlDoc, stringwriter);
-	
-	         return stringwriter.toString();
-	    } catch (Exception ex) {
-	        throw new JDOMException("Error converting Document to String"
-	                + ex);
-	    }
-	}
-	
-	private static String convertStreamToString(InputStream is, String encoding) {
-	    Scanner inputScan = new Scanner(is, encoding).useDelimiter("\\A");
-	    if(inputScan.hasNext()) {
-	    	return inputScan.next();
-	    }
-	    
-	    return "";
 	}
 	
 }
