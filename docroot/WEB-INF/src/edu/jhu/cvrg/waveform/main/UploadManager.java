@@ -92,12 +92,17 @@ public class UploadManager {
 	org.cvrgrid.philips.jaxb.beans.Restingecgdata philipsECG104;
 	org.cvrgrid.philips.DecodedLead[] leadData104;
  
-	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath, String characterEncoding) throws UploadFailureException {
+	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath) throws UploadFailureException {
 
 		metaData.setFileName(fileName);
 		metaData.setStudyID(studyID);
 		metaData.setDatatype(datatype);
-		metaData.setTreePath(virtualPath);
+		if(virtualPath != null) {
+			metaData.setTreePath(virtualPath);
+		}
+		else {
+			throw new UploadFailureException("Please select a folder");
+		}
 
 		user = ResourceUtility.getCurrentUser();
 
@@ -151,7 +156,7 @@ public class UploadManager {
 							throw new UploadFailureException("This Philips file has no document version information");
 						}
 					}
-					// indicates GE Muse 8
+					// indicates GE Muse 7
 					else if(xmlString.contains("RestingECG")) {
 						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
 						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
@@ -448,7 +453,6 @@ public class UploadManager {
 		    	returnValue = false;
 		    }
 		    
-		    //Close the input stream
 			if(wfdbInputStream != null) {
 				wfdbInputStream.close();
 			}
@@ -462,7 +466,6 @@ public class UploadManager {
 		}catch (Exception e){ //Catch exception if any
 			System.err.println("Error: " + e.getMessage());
 			try {
-			    //Close the input stream
 				if(wfdbInputStream != null) {
 					wfdbInputStream.close();
 				}
@@ -550,7 +553,7 @@ public class UploadManager {
 		
 		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
 		metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
-		metaData.setNumberOfPoints(leadData103[0].size());
+		metaData.setNumberOfPoints(leadData103[0].size() * metaData.getChannels());
 		
 		// delete ECG data structures to free up memory
 		philipsECG103 = null;
@@ -565,7 +568,7 @@ public class UploadManager {
 		
 		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
 		metaData.setChannels(signalMetaData.getNumberchannelsallocated().intValue());  // Method returns a BigInteger, so a conversion to int is required.
-		metaData.setNumberOfPoints(leadData104[0].size());
+		metaData.setNumberOfPoints(leadData104[0].size() * metaData.getChannels());
 		
 		// delete ECG data structures to free up memory
 		philipsECG104 = null;
@@ -600,7 +603,7 @@ public class UploadManager {
 						Element leadData = (Element)leadIter.next();
 						Element sampleCount = leadData.getChild("LeadSampleCountTotal");
 							
-						metaData.setNumberOfPoints(Integer.valueOf(sampleCount.getText()));
+						metaData.setNumberOfPoints(Integer.valueOf(sampleCount.getText()) * metaData.getChannels());
 					}
 				}
 			}

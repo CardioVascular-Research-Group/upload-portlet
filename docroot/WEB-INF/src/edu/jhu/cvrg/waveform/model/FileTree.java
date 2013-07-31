@@ -92,10 +92,21 @@ public class FileTree implements Serializable{
 		}
 	}
 
+	/**
+	 * 
+	 * @return - the name of the node if it exists in the database, null if the node cannot be located in the database (or none is selected)
+	 */
 	public String getSelectedNodePath() {
 
 		TreeNode node = this.selectedNode;
-		String path = (String) node.getData();
+		String path = "";
+		
+		if(node != null) {
+			path = (String) node.getData();
+		}
+		else {
+			return null;
+		}
 
 		while (!node.getParent().getData().toString().equals("Root")) {
 			node = node.getParent();

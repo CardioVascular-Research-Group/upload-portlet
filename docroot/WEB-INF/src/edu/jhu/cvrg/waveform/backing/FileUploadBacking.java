@@ -81,7 +81,7 @@ public class FileUploadBacking implements Serializable{
 
 			// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
 			// the function will use UTF-8 by default
-			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectedNodePath(), "UTF-16");
+			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectedNodePath());
 			msg = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
 			e.printStackTrace();
