@@ -126,49 +126,54 @@ public class UploadManager {
 					}
 					
 					xmlBuf.close();
-					xmlJdom = build(xmlString);
+					
+					// check for the first xml tag
+					// if it does not exist, remake the file using UTF-16 
+					// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
+					if(!(xmlString.contains("xml"))) {
+						// TODO:  In the future, use a library to check for the encoding that the stream uses
+						FileInputStream tempFis = new FileInputStream(tempFile);
+						xmlString = convertStreamToString(tempFis, "UTF-16");
+						tempFis.close();
+						tempFile.delete();
+						
+						fileToSave = new ByteArrayInputStream(xmlString.getBytes("UTF-16"));
+						tempFile = saveFileToTemp(fileToSave, fileSize);
+						
+					}
+					
 					
 					// indicates one of the Philips formats
-					if(xmlString.contains("restingecgdata")) {
-						Element restingEcgDataTag = xmlJdom.getRootElement();
-						Namespace ns = Namespace.getNamespace("http://www3.medical.philips.com");
-						Element docInfo = restingEcgDataTag.getChild("documentinfo", ns);
-						
-						if(docInfo != null) {
-							Element docVersion = docInfo.getChild("documentversion", ns);
-							if(docVersion != null && docVersion.getText().equals("1.03")) {
-								fileType = EnumFileType.PHIL103;
-								extractPhilips103Data(tempFile);
-							}
-							else if(docVersion != null && docVersion.getText().equals("1.04")) {
-								fileType = EnumFileType.PHIL104;
-								extractPhilips104Data(tempFile);
-							}
-							else {
-								throw new UploadFailureException("Unrecognized version number for Philips file");
-							}
+					
+					// JDOM seems to be having problems building the XML structure for Philips 1.03,
+					// Checking for the elements directly in the string is required to get the right version
+					// and also takes less memory
+					if(xmlString.contains("restingecgdata")) {						
+						if(xmlString.contains("<documentversion>1.03</documentversion>")) {
+							fileType = EnumFileType.PHIL103;
+							extractPhilips103Data(tempFile);
+						}
+						else if(xmlString.contains("<documentversion>1.04</documentversion>")) {
+							fileType = EnumFileType.PHIL104;
+							extractPhilips104Data(tempFile);
+						}
+						else {
+							throw new UploadFailureException("Unrecognized version number for Philips file");
+						}
 							
 							//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
 							// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
 							
-						}
-						else {
-							throw new UploadFailureException("This Philips file has no document version information");
-						}
 					}
 					// indicates GE Muse 7
 					else if(xmlString.contains("RestingECG")) {
 						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
 						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
-						
+						xmlJdom = build(xmlString);
 						fileType = EnumFileType.MUSEXML;
 						extractMuseXMLData();
 					}						
 					
-				}
-				
-				if(fileType == EnumFileType.PHIL103) {
-
 				}
 				
 				String userId = user.getScreenName();
@@ -558,7 +563,6 @@ public class UploadManager {
 		// delete ECG data structures to free up memory
 		philipsECG103 = null;
 		leadData103 = null;
-		xmlJdom = null;
 	}
 	
 	private void extractPhilips104Data(File file) throws IOException, JAXBException {
@@ -573,7 +577,6 @@ public class UploadManager {
 		// delete ECG data structures to free up memory
 		philipsECG104 = null;
 		leadData104 = null;
-		xmlJdom = null;
 	}
 	
 	private void extractMuseXMLData() {
@@ -634,6 +637,15 @@ public class UploadManager {
 	    	ioex.printStackTrace();
 	    }
 	    return doc;
+	}
+	
+	private static String convertStreamToString(InputStream is, String encoding) {
+	    Scanner inputScan = new Scanner(is, encoding).useDelimiter("\\A");
+	    if(inputScan.hasNext()) {
+	    	return inputScan.next();
+	    }
+
+	    return "";
 	}
 	
 }
