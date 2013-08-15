@@ -359,6 +359,9 @@ public class UploadManager {
 					com.liferay.util.portlet.PortletProps.get("dbDriver"), 
 					com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
 			utility.storeFileMetaData(metaData);
+			
+			// Create instances of the appropriate class for extracting annotations if it is a Philips or Muse file
+			
 	}
 
 	// TODO: make this into a function which determines which kind of text file
@@ -560,9 +563,6 @@ public class UploadManager {
 		metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
 		metaData.setNumberOfPoints(leadData103[0].size() * metaData.getChannels());
 		
-		// delete ECG data structures to free up memory
-		philipsECG103 = null;
-		leadData103 = null;
 	}
 	
 	private void extractPhilips104Data(File file) throws IOException, JAXBException {
@@ -573,10 +573,7 @@ public class UploadManager {
 		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
 		metaData.setChannels(signalMetaData.getNumberchannelsallocated().intValue());  // Method returns a BigInteger, so a conversion to int is required.
 		metaData.setNumberOfPoints(leadData104[0].size() * metaData.getChannels());
-		
-		// delete ECG data structures to free up memory
-		philipsECG104 = null;
-		leadData104 = null;
+
 	}
 	
 	private void extractMuseXMLData() {
@@ -611,9 +608,6 @@ public class UploadManager {
 				}
 			}
 		}
-		
-		// delete JDOM object to free up memory
-		xmlJdom = null;
 	}
 	
 	
