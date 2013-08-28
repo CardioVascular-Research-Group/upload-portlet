@@ -37,7 +37,14 @@ public class Philips104Annotations {
 	private void populateCrossleadAnnotations() {
 		Crossleadmeasurements crossAnnotations = restingECG.getInternalmeasurements().getCrossleadmeasurements();
 		
-		LinkedHashMap<String, String> annotationMappings = this.extractCrossleadElements(crossAnnotations);
+		LinkedHashMap<String, Object> annotationMappings = this.extractCrossleadElements(crossAnnotations);
+		
+		for(String key : annotationMappings.keySet()) {
+			if((annotationMappings.get(key) != null)) {
+				System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
+				this.generateWaveformAnnotations(key, annotationMappings.get(key).toString());
+			}
+		}
 		
 	}
 	
@@ -49,8 +56,8 @@ public class Philips104Annotations {
 		
 	}
 	
-	private LinkedHashMap<String, String> extractCrossleadElements(Crossleadmeasurements globalAnnotations) {
-		LinkedHashMap<String, String> annotationMappings = new LinkedHashMap<String, String>();
+	private LinkedHashMap<String, Object> extractCrossleadElements(Crossleadmeasurements globalAnnotations) {
+		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
 		
 		// The mapping will need to be filled manually since currently we cannot get a list of all of the elements
 		// Do not do complex annotation measurements yet.  Stick with the simple ones.
@@ -70,19 +77,25 @@ public class Philips104Annotations {
 		
 		// concatenate all the beat classifications, as that is how they appear in the XML
 		for (Integer beatValue : globalAnnotations.getBeatclassification()) {
-			beatClassificationValues = beatClassificationValues + " " + beatValue.toString();
+			beatClassificationValues = beatClassificationValues + " " + beatValue;
 		}
 		annotationMappings.put("beatclassification", beatClassificationValues);
 		int subscript = 1;
 		
 		// enter the qamessagecodes one by one, as that is how they are in the XML
 		for(TYPEmessagecode mCode : globalAnnotations.getQamessagecodes().getQamessagecode()) {
-			String messageName = "qamessagecode" + subscript;
-			annotationMappings.put(messageName, mCode.value());
-			subscript++;
+			if(mCode != null) {
+				String messageName = "qamessagecode" + subscript;
+				annotationMappings.put(messageName, mCode.value());
+				subscript++;
+			}
 		}
 		
-		annotationMappings.put("qaactioncode", globalAnnotations.getQaactioncode().value());
+		// additional checks for null are needed on some of these retrievals.  Some of them require methods other
+		// than toString()
+		if(globalAnnotations.getQaactioncode() != null) {
+			annotationMappings.put("qaactioncode", globalAnnotations.getQaactioncode().value());
+		}
 		annotationMappings.put("pfrontaxis", globalAnnotations.getPfrontaxis());
 		annotationMappings.put("phorizaxis", globalAnnotations.getPhorizaxis());
 		annotationMappings.put("i40frontaxis", globalAnnotations.getI40Frontaxis());
@@ -113,24 +126,26 @@ public class Philips104Annotations {
 		annotationMappings.put("wenckcount", globalAnnotations.getWenckcount());
 		annotationMappings.put("wenckstring", globalAnnotations.getWenckstring());
 		annotationMappings.put("flutterfibcount", globalAnnotations.getFlutterfibcount());
-		annotationMappings.put("leadreversalcode", globalAnnotations.getLeadreversalcode().toString());
-		annotationMappings.put("atrialrhythm", globalAnnotations.getAtrialrhythm().toString());
+		
+		annotationMappings.put("leadreversalcode", globalAnnotations.getLeadreversalcode());
+		
+		annotationMappings.put("atrialrhythm", globalAnnotations.getAtrialrhythm());
 		annotationMappings.put("atrialratepowerspect", globalAnnotations.getAtrialratepowerspect());
-		annotationMappings.put("ventrhythm", globalAnnotations.getVentrhythm().toString());
+		annotationMappings.put("ventrhythm", globalAnnotations.getVentrhythm());
 		annotationMappings.put("randomrrpercent", globalAnnotations.getRandomrrpercent());
 		annotationMappings.put("regularrrpercent", globalAnnotations.getRegularrrpercent());
 		annotationMappings.put("biggestrrgrouppercent", globalAnnotations.getBiggestrrgrouppercent());
-		annotationMappings.put("biggestrrgroupvar", globalAnnotations.getBiggestrrgroupvar().toString());
-		annotationMappings.put("nrrgroups", globalAnnotations.getNrrgroups().toString());
+		annotationMappings.put("biggestrrgroupvar", globalAnnotations.getBiggestrrgroupvar());
+		annotationMappings.put("nrrgroups", globalAnnotations.getNrrgroups());
 		annotationMappings.put("bigemrrintvlacf", globalAnnotations.getBigemrrintvlacf());
 		annotationMappings.put("trigemrrintvlacf", globalAnnotations.getTrigemrrintvlacf());
-		annotationMappings.put("fibfreqmhz", globalAnnotations.getFibfreqmhz().toString());
-		annotationMappings.put("fibampnv", globalAnnotations.getFibampnv().toString());
-		annotationMappings.put("fibwidthmhz", globalAnnotations.getFibwidthmhz().toString());
-		annotationMappings.put("fibmedianfreqmhz", globalAnnotations.getFibmedianfreqmhz().toString());
-		annotationMappings.put("afltcyclelen", globalAnnotations.getAfltcyclelen().toString());
+		annotationMappings.put("fibfreqmhz", globalAnnotations.getFibfreqmhz());
+		annotationMappings.put("fibampnv", globalAnnotations.getFibampnv());
+		annotationMappings.put("fibwidthmhz", globalAnnotations.getFibwidthmhz());
+		annotationMappings.put("fibmedianfreqmhz", globalAnnotations.getFibmedianfreqmhz());
+		annotationMappings.put("afltcyclelen", globalAnnotations.getAfltcyclelen());
 		annotationMappings.put("afltacfpeak", globalAnnotations.getAfltacfpeak());
-		annotationMappings.put("afltacfpeakwidth", globalAnnotations.getAfltacfpeakwidth().toString());
+		annotationMappings.put("afltacfpeakwidth", globalAnnotations.getAfltacfpeakwidth());
 		annotationMappings.put("constantpshapepct", globalAnnotations.getConstantpshapepct());
 		annotationMappings.put("atrialrateirregpct", globalAnnotations.getAtrialrateirregpct());
 		
@@ -200,16 +215,20 @@ public class Philips104Annotations {
 		annotationMappings.put("sagttermangle", globalAnnotations.getSagttermangle());
 		annotationMappings.put("sagttermmag", globalAnnotations.getSagttermmag());
 		
-		annotationMappings.put("preexcitation", globalAnnotations.getPreexcitation().toString());
+		annotationMappings.put("preexcitation", globalAnnotations.getPreexcitation());
 		
 		// TODO:  Get beat annotations once the schema has been changed to accomdate for them
 		
-		annotationMappings.put("analysiserror", globalAnnotations.getAnalysiserror().toString());
+		annotationMappings.put("analysiserror", globalAnnotations.getAnalysiserror());
 		annotationMappings.put("analysiserrormessage", globalAnnotations.getAnalysiserrormessage());
 		
 		// TODO:  Get namedmeasurements, if any.
 		
 		return annotationMappings;
+	}
+	
+	private void generateWaveformAnnotations(String annotationName, String annotationValue) {
+		
 	}
 
 }

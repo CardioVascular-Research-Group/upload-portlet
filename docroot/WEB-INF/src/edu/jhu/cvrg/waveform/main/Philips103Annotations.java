@@ -42,8 +42,10 @@ public class Philips103Annotations {
 			LinkedHashMap<String, String> annotationMappings = this.extractGlobalElements(globalAnnotations);
 			
 			for(String key : annotationMappings.keySet()) {
-				System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key));
-				this.generateWaveformAnnotations(key, annotationMappings.get(key));
+				if(annotationMappings.get(key) != null) {
+					System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key));
+					this.generateWaveformAnnotations(key, annotationMappings.get(key));
+				}
 			}
 			
 		}
@@ -79,6 +81,10 @@ public class Philips103Annotations {
 			
 			String beatClassificationValues = "";
 			
+			// Only one additional check for null is need in the 1.03 version, 
+			// as most of these elements are required in that version of the schema
+			// The ones that are not are already taken care of in the function that calls this one.
+			
 			// concatenate all the beat classifications, as that is how they appear in the XML
 			for (Integer beatValue : globalAnnotations.getBeatclassification()) {
 				beatClassificationValues = beatClassificationValues + " " + beatValue.toString();
@@ -88,9 +94,11 @@ public class Philips103Annotations {
 			
 			// enter the qamessagecodes one by one, as that is how they are in the XML
 			for(org.sierraecg.schema.TYPEmessagecode mCode : globalAnnotations.getQamessagecodes().getQamessagecode()) {
-				String messageName = "qamessagecode" + subscript;
-				annotationMappings.put(messageName, mCode.value());
-				subscript++;
+				if(mCode != null) {
+					String messageName = "qamessagecode" + subscript;
+					annotationMappings.put(messageName, mCode.value());
+					subscript++;
+				}
 			}
 			
 			annotationMappings.put("qaactioncode", globalAnnotations.getQaactioncode().value());
