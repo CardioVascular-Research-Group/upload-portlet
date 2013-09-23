@@ -1,6 +1,6 @@
 package edu.jhu.cvrg.waveform.main;
 
-import org.cvrgrid.philips.jaxb.beans.TYPEmessagecode;
+
 import org.sierraecg.*;
 import org.sierraecg.schema.*;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ public class Philips103Annotations {
 			
 			for(String key : annotationMappings.keySet()) {
 				if(annotationMappings.get(key) != null) {
-					System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key));
+					//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key));
 					this.generateWaveformAnnotations(key, annotationMappings.get(key));
 				}
 			}
@@ -51,7 +51,18 @@ public class Philips103Annotations {
 		}
 		
 		private void populateGroupAnnotations() {
+			Groupmeasurements groupAnnotations = restingECG.getMeasurements().getGroupmeasurements();
 			
+			List<Groupmeasurement> groupAnnotation = groupAnnotations.getGroupmeasurement();
+			
+			for(Groupmeasurement annotation : groupAnnotation) {
+				LinkedHashMap<String, Object> groupMappings = this.extractGroupMeasurements(annotation);
+				
+				for(String key : groupMappings.keySet()) {
+					System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
+					this.generateWaveformAnnotations(key, groupMappings.get(key).toString());
+				}
+			}
 		}
 		
 		private void populateLeadAnnotations() {
@@ -147,6 +158,36 @@ public class Philips103Annotations {
 			annotationMappings.put("globalreserved", globalAnnotations.getGlobalreserved());
 			
 			return annotationMappings;
+		}
+		
+		private LinkedHashMap<String, Object> extractGroupMeasurements(Groupmeasurement annotation) {
+			LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
+			
+			annotationMappings.put("membercount", annotation.getMembercount());
+			annotationMappings.put("memberpercent", annotation.getMemberpercent());
+			annotationMappings.put("longestrun", annotation.getLongestrun());
+			annotationMappings.put("meanqrsdur", annotation.getMeanqrsdur());
+			annotationMappings.put("lowventrate", annotation.getLowventrate());
+			annotationMappings.put("meanventrate", annotation.getMeanventrate());
+			annotationMappings.put("highventrate", annotation.getHighventrate());
+			annotationMappings.put("ventratestddev", annotation.getVentratestddev());
+			annotationMappings.put("meanrrint", annotation.getMeanrrint());
+			annotationMappings.put("atrialrate", annotation.getAtrialrate());
+			annotationMappings.put("atrialratestdev", annotation.getAtrialratestddev());
+			annotationMappings.put("avgpcount", annotation.getAvgpcount());
+			annotationMappings.put("notavgbeats", annotation.getNotavgpbeats());
+			annotationMappings.put("lowprint", annotation.getLowprint());
+			annotationMappings.put("meanprint", annotation.getMeanprint());
+			annotationMappings.put("highprint", annotation.getHighprint());
+			annotationMappings.put("printstddev", annotation.getPrintstddev());
+			annotationMappings.put("meanprseg", annotation.getMeanprseg());
+			annotationMappings.put("meanqtint", annotation.getMeanqtint());
+			annotationMappings.put("meanqtseg", annotation.getMeanqtseg());
+			annotationMappings.put("comppausecount", annotation.getComppausecount());
+			annotationMappings.put("groupreserved", annotation.getGroupreserved());
+			
+			return annotationMappings;
+			
 		}
 		
 		private void generateWaveformAnnotations(String annotationName, String annotationValue) {
