@@ -16,17 +16,17 @@ import org.sierraecg.schema.*;
  */
 public class ProcessPhilips103 {
 	Restingecgdata restingECG;
-	ArrayList<String> globalAnnotations;
-	ArrayList<String[]> groupAnnotations;
-	ArrayList<String[]> leadAnnotations;
+	ArrayList<String> globalAnnotationsList;
+	ArrayList<String[]> groupAnnotationsList;
+	ArrayList<String[]> leadAnnotationsList;
 	Philips103Annotations annotationRetriever;
 	
 	public ProcessPhilips103(Restingecgdata newECG) {
 		restingECG = newECG;
 		annotationRetriever = new Philips103Annotations();
-		globalAnnotations = new ArrayList<String>();
-		groupAnnotations = new ArrayList<String[]>();
-		leadAnnotations = new ArrayList<String[]>();
+		globalAnnotationsList = new ArrayList<String>();
+		groupAnnotationsList = new ArrayList<String[]>();
+		leadAnnotationsList = new ArrayList<String[]>();
 	}
 	
 	public void setRestingECG(Restingecgdata newECG) {
@@ -35,6 +35,18 @@ public class ProcessPhilips103 {
 	
 	public Restingecgdata getRestingECG() {
 		return restingECG;
+	}
+	
+	public ArrayList<String> getGlobalAnnotations() {
+		return globalAnnotationsList;
+	}
+	
+	public ArrayList<String[]> getGroupAnnotations() {
+		return groupAnnotationsList;
+	}
+	
+	public ArrayList<String[]> getLeadAnnotations() {
+		return leadAnnotationsList;
 	}
 	
 	public void populateAnnotations() {
@@ -54,7 +66,7 @@ public class ProcessPhilips103 {
 		for(String key : annotationMappings.keySet()) {
 			if(annotationMappings.get(key) != null) {
 				//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key));
-				this.generateWaveformAnnotations(key, annotationMappings.get(key));
+				globalAnnotationsList.add(annotationMappings.get(key).toString());
 			}
 		}
 		
@@ -67,11 +79,17 @@ public class ProcessPhilips103 {
 		
 		for(Groupmeasurement annotation : groupAnnotation) {
 			LinkedHashMap<String, Object> groupMappings = annotationRetriever.extractGroupMeasurements(annotation);
+			String[] annotationsToAdd = new String[groupMappings.size()];
+			int index = 0;
 			
 			for(String key : groupMappings.keySet()) {
 				//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
-				this.generateWaveformAnnotations(key, groupMappings.get(key).toString());
+				System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
+				annotationsToAdd[index] = groupMappings.get(key).toString();
+				index++;
 			}
+			
+			groupAnnotationsList.add(annotationsToAdd);
 		}
 	}
 	
@@ -83,15 +101,16 @@ public class ProcessPhilips103 {
 		for(Leadmeasurement annotation: leadAnnotationGroup) {
 			System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
 			LinkedHashMap<String, Object> leadMappings = annotationRetriever.extractLeadMeasurements(annotation);
+			String[] annotationsToAdd = new String[leadMappings.size()];
+			int index = 0;
 			
 			for(String key : leadMappings.keySet()) {
 				System.out.println("Annotation Name = " + key + " and value = " + leadMappings.get(key).toString());
-				this.generateWaveformAnnotations(key, leadMappings.get(key).toString());
-			}			
+				annotationsToAdd[index] = leadMappings.get(key).toString();
+				index++;
+			}
+			
+			leadAnnotationsList.add(annotationsToAdd);			
 		}
-	}
-	
-	private void generateWaveformAnnotations(String annotationName, String annotationValue) {
-		
 	}
 }
