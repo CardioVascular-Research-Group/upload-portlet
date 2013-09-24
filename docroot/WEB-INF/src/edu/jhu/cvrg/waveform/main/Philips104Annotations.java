@@ -2,84 +2,17 @@ package edu.jhu.cvrg.waveform.main;
 
 import org.cvrgrid.philips.jaxb.beans.*;
 import org.cvrgrid.philips.jaxb.schema.*;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 
-public class Philips104Annotations {
-	Restingecgdata restingECG;
-	ArrayList<String> globalAnnotations;
-	ArrayList<String>[] groupAnnotations;
-	ArrayList<String>[] leadAnnotations;
+// This class contains methods for retrieving annotations from the XML file.
+// The class is left at the default (package level) visibility as they are not intended to
+// be used by classes outside of this package.
+//
+// Author: Brandon Benitez
+
+class Philips104Annotations {
 	
-	public Philips104Annotations(Restingecgdata newECG) {
-		restingECG = newECG;
-	}
-	
-	public void setRestingECG(Restingecgdata newECG) {
-		restingECG = newECG;
-	}
-	
-	public Restingecgdata getRestingECG() {
-		return restingECG;
-	}
-	
-	public void populateAnnotations() {
-		
-		this.populateCrossleadAnnotations();
-		this.populateGroupAnnotations();
-		this.populateLeadAnnotations();
-	}
-	
-	
-	
-	private void populateCrossleadAnnotations() {
-		Crossleadmeasurements crossAnnotations = restingECG.getInternalmeasurements().getCrossleadmeasurements();
-		
-		LinkedHashMap<String, Object> annotationMappings = this.extractCrossleadElements(crossAnnotations);
-		
-		for(String key : annotationMappings.keySet()) {
-			if((annotationMappings.get(key) != null)) {
-				//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
-				this.generateWaveformAnnotations(key, annotationMappings.get(key).toString());
-			}
-		}
-		
-	}
-	
-	private void populateGroupAnnotations() {
-		Groupmeasurements groupAnnotations = restingECG.getInternalmeasurements().getGroupmeasurements();
-		
-		List<Groupmeasurement> groupAnnotation = groupAnnotations.getGroupmeasurement();
-		
-		for(Groupmeasurement annotation : groupAnnotation) {
-			LinkedHashMap<String, Object> groupMappings = this.extractGroupMeasurements(annotation);
-			
-			for(String key : groupMappings.keySet()) {
-				//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
-				this.generateWaveformAnnotations(key, groupMappings.get(key).toString());
-			}
-		}
-	}
-	
-	private void populateLeadAnnotations() {
-		Leadmeasurements allLeadAnnotations = restingECG.getInternalmeasurements().getLeadmeasurements();
-		
-		List<Leadmeasurement> leadAnnotationGroup = allLeadAnnotations.getLeadmeasurement();
-		
-		for(Leadmeasurement annotation: leadAnnotationGroup) {
-			System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
-			LinkedHashMap<String, Object> leadMappings = this.extractLeadMeasurements(annotation);
-			
-			for(String key : leadMappings.keySet()) {
-				System.out.println("Annotation Name = " + key + " and value = " + leadMappings.get(key).toString());
-				this.generateWaveformAnnotations(key, leadMappings.get(key).toString());
-			}			
-		}
-	}
-	
-	private LinkedHashMap<String, Object> extractCrossleadElements(Crossleadmeasurements crossLeadAnnotations) {
+	LinkedHashMap<String, Object> extractCrossleadElements(Crossleadmeasurements crossLeadAnnotations) {
 		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
 		
 		// The mapping will need to be filled manually since currently we cannot get a list of all of the elements
@@ -249,7 +182,7 @@ public class Philips104Annotations {
 		return annotationMappings;
 	}
 	
-	private LinkedHashMap<String, Object> extractGroupMeasurements(Groupmeasurement groupMeasurements) {
+	LinkedHashMap<String, Object> extractGroupMeasurements(Groupmeasurement groupMeasurements) {
 		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
 		
 		annotationMappings.put("Member Count", groupMeasurements.getMembercount());
@@ -278,7 +211,7 @@ public class Philips104Annotations {
 		
 	}
 	
-	private LinkedHashMap<String, Object> extractLeadMeasurements(Leadmeasurement leadMeasurements) {
+	LinkedHashMap<String, Object> extractLeadMeasurements(Leadmeasurement leadMeasurements) {
 		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
 		
 		annotationMappings.put("P Amplitude", leadMeasurements.getPamp());
@@ -323,10 +256,6 @@ public class Philips104Annotations {
 		
 		
 		return annotationMappings;		
-	}
-	
-	private void generateWaveformAnnotations(String annotationName, String annotationValue) {
-		
 	}
 
 }
