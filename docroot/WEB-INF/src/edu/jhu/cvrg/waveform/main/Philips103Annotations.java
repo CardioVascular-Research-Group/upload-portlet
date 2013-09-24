@@ -1,8 +1,10 @@
 package edu.jhu.cvrg.waveform.main;
 
 
+
 import org.sierraecg.*;
 import org.sierraecg.schema.*;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -59,16 +61,28 @@ public class Philips103Annotations {
 				LinkedHashMap<String, Object> groupMappings = this.extractGroupMeasurements(annotation);
 				
 				for(String key : groupMappings.keySet()) {
-					System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
+					//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
 					this.generateWaveformAnnotations(key, groupMappings.get(key).toString());
 				}
 			}
 		}
 		
 		private void populateLeadAnnotations() {
+			Leadmeasurements allLeadAnnotations = restingECG.getMeasurements().getLeadmeasurements();
 			
+			List<Leadmeasurement> leadAnnotationGroup = allLeadAnnotations.getLeadmeasurement();
+			
+			for(Leadmeasurement annotation: leadAnnotationGroup) {
+				System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
+				LinkedHashMap<String, Object> leadMappings = this.extractLeadMeasurements(annotation);
+				
+				for(String key : leadMappings.keySet()) {
+					System.out.println("Annotation Name = " + key + " and value = " + leadMappings.get(key).toString());
+					this.generateWaveformAnnotations(key, leadMappings.get(key).toString());
+				}			
+			}
 		}
-		
+
 		private LinkedHashMap<String, String> extractGlobalElements(Globalmeasurements globalAnnotations) {
 			LinkedHashMap<String, String> annotationMappings = new LinkedHashMap<String, String>();
 			
@@ -85,10 +99,10 @@ public class Philips103Annotations {
 			//annotationMappings.put("pacemode", globalAnnotations.getPacemode());
 			annotationMappings.put("pacemalf", globalAnnotations.getPacemalf());
 			annotationMappings.put("pacemisc", globalAnnotations.getPacemisc());
-			annotationMappings.put("ectopicrhythm", globalAnnotations.getEctopicrhythm());
-			annotationMappings.put("qintdispersion", globalAnnotations.getQtintdispersion());
-			annotationMappings.put("numberofcomplexes", globalAnnotations.getNumberofcomplexes());
-			annotationMappings.put("numberofgroups", globalAnnotations.getNumberofgroups());
+			annotationMappings.put("Ectopic Rhythm", globalAnnotations.getEctopicrhythm());
+			annotationMappings.put("QT Interval Dispersion", globalAnnotations.getQtintdispersion());
+			annotationMappings.put("Number of Complexes", globalAnnotations.getNumberofcomplexes());
+			annotationMappings.put("Number of Groups", globalAnnotations.getNumberofgroups());
 			
 			String beatClassificationValues = "";
 			
@@ -113,34 +127,34 @@ public class Philips103Annotations {
 			}
 			
 			annotationMappings.put("qaactioncode", globalAnnotations.getQaactioncode().value());
-			annotationMappings.put("pon", globalAnnotations.getPon());
-			annotationMappings.put("qrson", globalAnnotations.getQrson());
-			annotationMappings.put("qrsoff", globalAnnotations.getQrsoff());
-			annotationMappings.put("ton", globalAnnotations.getTon());
-			annotationMappings.put("toff", globalAnnotations.getToff());
-			annotationMappings.put("pfrontaxis", globalAnnotations.getPfrontaxis());
-			annotationMappings.put("phorizaxis", globalAnnotations.getPhorizaxis());
-			annotationMappings.put("i40frontaxis", globalAnnotations.getI40Frontaxis());
-			annotationMappings.put("i40horizaxis", globalAnnotations.getI40Horizaxis());
-			annotationMappings.put("qrsfrontaxis", globalAnnotations.getQrsfrontaxis());
-			annotationMappings.put("qrshorizaxis", globalAnnotations.getQrshorizaxis());
-			annotationMappings.put("t40frontaxis", globalAnnotations.getT40Frontaxis());
-			annotationMappings.put("t40horizaxis", globalAnnotations.getT40Horizaxis());
-			annotationMappings.put("stfrontaxis", globalAnnotations.getStfrontaxis());
-			annotationMappings.put("sthorizaxis", globalAnnotations.getSthorizaxis());
-			annotationMappings.put("tfrontaxis", globalAnnotations.getTfrontaxis());
-			annotationMappings.put("thorizaxis", globalAnnotations.getThorizaxis());
-			annotationMappings.put("atrialrate", globalAnnotations.getAtrialrate());
-			annotationMappings.put("lowventrate", globalAnnotations.getLowventrate());
-			annotationMappings.put("meanventrate", globalAnnotations.getMeanventrate());
-			annotationMappings.put("highventrate", globalAnnotations.getHighventrate());
-			annotationMappings.put("meanprint", globalAnnotations.getMeanprint());
-			annotationMappings.put("meanprseg", globalAnnotations.getMeanprseg());
-			annotationMappings.put("meanqrsdur", globalAnnotations.getMeanqrsdur());
-			annotationMappings.put("meanqtint", globalAnnotations.getMeanqtint());
-			annotationMappings.put("meanqtc", globalAnnotations.getMeanqtc());
-			annotationMappings.put("deltawavecount", globalAnnotations.getDeltawavecount());
-			annotationMappings.put("deltawavepercent", globalAnnotations.getDeltawavepercent());
+			annotationMappings.put("P Onset", globalAnnotations.getPon());
+			annotationMappings.put("QRS Onset", globalAnnotations.getQrson());
+			annotationMappings.put("QRS Offset", globalAnnotations.getQrsoff());
+			annotationMappings.put("T Onset", globalAnnotations.getTon());
+			annotationMappings.put("T Offset", globalAnnotations.getToff());
+			annotationMappings.put("P Frontal Axis", globalAnnotations.getPfrontaxis());
+			annotationMappings.put("P Horizontal Axis", globalAnnotations.getPhorizaxis());
+			annotationMappings.put("i40 Frontal Axis", globalAnnotations.getI40Frontaxis());
+			annotationMappings.put("i40 Horizontal Axis", globalAnnotations.getI40Horizaxis());
+			annotationMappings.put("QRS Frontal Axis", globalAnnotations.getQrsfrontaxis());
+			annotationMappings.put("QRS Horizontal Axis", globalAnnotations.getQrshorizaxis());
+			annotationMappings.put("t40 Frontal Axis", globalAnnotations.getT40Frontaxis());
+			annotationMappings.put("t40 Horizontal Axis", globalAnnotations.getT40Horizaxis());
+			annotationMappings.put("ST Frontal Axis", globalAnnotations.getStfrontaxis());
+			annotationMappings.put("ST Horizontal Axis", globalAnnotations.getSthorizaxis());
+			annotationMappings.put("T Frontal Axis", globalAnnotations.getTfrontaxis());
+			annotationMappings.put("T Horizontal Axis", globalAnnotations.getThorizaxis());
+			annotationMappings.put("Atrial Rate", globalAnnotations.getAtrialrate());
+			annotationMappings.put("Minimum Ventricular Rate", globalAnnotations.getLowventrate());
+			annotationMappings.put("Mean Ventricular Rate", globalAnnotations.getMeanventrate());
+			annotationMappings.put("High Ventricular Rate", globalAnnotations.getHighventrate());
+			annotationMappings.put("Mean PR Interval", globalAnnotations.getMeanprint());
+			annotationMappings.put("Mean PR Segment", globalAnnotations.getMeanprseg());
+			annotationMappings.put("Mean QRS Duration", globalAnnotations.getMeanqrsdur());
+			annotationMappings.put("Mean QT Interval", globalAnnotations.getMeanqtint());
+			annotationMappings.put("Mean QT Corrected", globalAnnotations.getMeanqtc());
+			annotationMappings.put("Delta Wave Count", globalAnnotations.getDeltawavecount());
+			annotationMappings.put("Delta Wave Percent", globalAnnotations.getDeltawavepercent());
 			annotationMappings.put("bigeminycount", globalAnnotations.getBigeminycount());
 			annotationMappings.put("bigeminystring", globalAnnotations.getBigeminystring());
 			annotationMappings.put("trigeminycount", globalAnnotations.getTrigeminycount());
@@ -148,13 +162,13 @@ public class Philips103Annotations {
 			annotationMappings.put("wenckcount", globalAnnotations.getWenckcount());
 			annotationMappings.put("wenckstring", globalAnnotations.getWenckstring());
 			annotationMappings.put("flutterfibcount", globalAnnotations.getFlutterfibcount());
-			annotationMappings.put("qrsinitangle", globalAnnotations.getQrsinitangle());
-			annotationMappings.put("qrsinitmag", globalAnnotations.getQrsinitmag());
-			annotationMappings.put("qrsmaxangle", globalAnnotations.getQrsmaxangle());
-			annotationMappings.put("qrsmaxmag", globalAnnotations.getQrsmaxmag());
-			annotationMappings.put("qrstermangle", globalAnnotations.getQrstermangle());
-			annotationMappings.put("qrstermmag", globalAnnotations.getQrstermmag());
-			annotationMappings.put("qrsrotation", globalAnnotations.getQrsrotation());
+			annotationMappings.put("QRS Initial Angle", globalAnnotations.getQrsinitangle());
+			annotationMappings.put("QRS Initial Magnitude", globalAnnotations.getQrsinitmag());
+			annotationMappings.put("QRS Maximum Angle", globalAnnotations.getQrsmaxangle());
+			annotationMappings.put("QRS Maximum Magnitude", globalAnnotations.getQrsmaxmag());
+			annotationMappings.put("QRS Terminal Angle", globalAnnotations.getQrstermangle());
+			annotationMappings.put("QRS Terminal Magnitude", globalAnnotations.getQrstermmag());
+			annotationMappings.put("QRS Rotation", globalAnnotations.getQrsrotation());
 			annotationMappings.put("globalreserved", globalAnnotations.getGlobalreserved());
 			
 			return annotationMappings;
@@ -163,31 +177,76 @@ public class Philips103Annotations {
 		private LinkedHashMap<String, Object> extractGroupMeasurements(Groupmeasurement annotation) {
 			LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
 			
-			annotationMappings.put("membercount", annotation.getMembercount());
-			annotationMappings.put("memberpercent", annotation.getMemberpercent());
-			annotationMappings.put("longestrun", annotation.getLongestrun());
-			annotationMappings.put("meanqrsdur", annotation.getMeanqrsdur());
-			annotationMappings.put("lowventrate", annotation.getLowventrate());
-			annotationMappings.put("meanventrate", annotation.getMeanventrate());
-			annotationMappings.put("highventrate", annotation.getHighventrate());
-			annotationMappings.put("ventratestddev", annotation.getVentratestddev());
-			annotationMappings.put("meanrrint", annotation.getMeanrrint());
-			annotationMappings.put("atrialrate", annotation.getAtrialrate());
-			annotationMappings.put("atrialratestdev", annotation.getAtrialratestddev());
+			annotationMappings.put("Member Count", annotation.getMembercount());
+			annotationMappings.put("Member Percent", annotation.getMemberpercent());
+			annotationMappings.put("Longest Run", annotation.getLongestrun());
+			annotationMappings.put("Mean QRS Duration", annotation.getMeanqrsdur());
+			annotationMappings.put("Minimum Ventricular Rate", annotation.getLowventrate());
+			annotationMappings.put("Mean Ventricular Rate", annotation.getMeanventrate());
+			annotationMappings.put("Maximum Ventricular Rate", annotation.getHighventrate());
+			annotationMappings.put("Ventricular Rate Standard Deviation", annotation.getVentratestddev());
+			annotationMappings.put("Mean RR Interval", annotation.getMeanrrint());
+			annotationMappings.put("Atrial Rate", annotation.getAtrialrate());
+			annotationMappings.put("Atrial Rate Standard Deviation", annotation.getAtrialratestddev());
 			annotationMappings.put("avgpcount", annotation.getAvgpcount());
 			annotationMappings.put("notavgbeats", annotation.getNotavgpbeats());
-			annotationMappings.put("lowprint", annotation.getLowprint());
-			annotationMappings.put("meanprint", annotation.getMeanprint());
-			annotationMappings.put("highprint", annotation.getHighprint());
-			annotationMappings.put("printstddev", annotation.getPrintstddev());
-			annotationMappings.put("meanprseg", annotation.getMeanprseg());
-			annotationMappings.put("meanqtint", annotation.getMeanqtint());
-			annotationMappings.put("meanqtseg", annotation.getMeanqtseg());
-			annotationMappings.put("comppausecount", annotation.getComppausecount());
+			annotationMappings.put("Minimum PR Interval", annotation.getLowprint());
+			annotationMappings.put("Mean PR Interval", annotation.getMeanprint());
+			annotationMappings.put("High PR Interval", annotation.getHighprint());
+			annotationMappings.put("PR Interval Standard Deviation", annotation.getPrintstddev());
+			annotationMappings.put("Mean PR Segment", annotation.getMeanprseg());
+			annotationMappings.put("Mean QT Interval", annotation.getMeanqtint());
+			annotationMappings.put("Mean QT Segment", annotation.getMeanqtseg());
 			annotationMappings.put("groupreserved", annotation.getGroupreserved());
 			
 			return annotationMappings;
 			
+		}
+		
+		private LinkedHashMap<String, Object> extractLeadMeasurements(Leadmeasurement leadMeasurements) {
+			LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
+			
+			annotationMappings.put("P Amplitude", leadMeasurements.getPamp());
+			annotationMappings.put("P Duration", leadMeasurements.getPdur());
+			annotationMappings.put("P Area", leadMeasurements.getParea());
+			annotationMappings.put("P' Amplitude", leadMeasurements.getPpamp());
+			annotationMappings.put("P' Duration", leadMeasurements.getPpdur());
+			annotationMappings.put("P'' Duration", leadMeasurements.getPpppdur());
+			annotationMappings.put("P' Area", leadMeasurements.getPparea());
+			annotationMappings.put("P'' Area", leadMeasurements.getPppparea());
+			annotationMappings.put("Q Amplitude", leadMeasurements.getQamp());
+			annotationMappings.put("Q Duration", leadMeasurements.getQdur());
+			annotationMappings.put("R Amplitude", leadMeasurements.getRamp());
+			annotationMappings.put("R Duration", leadMeasurements.getRdur());
+			annotationMappings.put("S Amplitude", leadMeasurements.getSamp());
+			annotationMappings.put("S Duration", leadMeasurements.getSdur());
+			annotationMappings.put("R' Amplitude", leadMeasurements.getRpamp());
+			annotationMappings.put("R' Duration", leadMeasurements.getRpdur());
+			annotationMappings.put("S' Amplitude", leadMeasurements.getSpamp());
+			annotationMappings.put("S' Duration", leadMeasurements.getSpdur());
+			annotationMappings.put("Ventricular Activation Time", leadMeasurements.getVat());
+			annotationMappings.put("QRS Amplitude", leadMeasurements.getQrsppk());
+			annotationMappings.put("QRS Duration", leadMeasurements.getQrsdur());
+			annotationMappings.put("QRS Area", leadMeasurements.getQrsarea());
+			annotationMappings.put("ST Segment Onset", leadMeasurements.getSton());
+			annotationMappings.put("ST Segment Midpoint", leadMeasurements.getStmid());
+			annotationMappings.put("ST Segment Offset", leadMeasurements.getStend());
+			annotationMappings.put("ST Segment Duration", leadMeasurements.getStdur());
+			annotationMappings.put("ST Segment Slope", leadMeasurements.getStslope());
+			annotationMappings.put("ST Segment Shape", leadMeasurements.getStshape());
+			annotationMappings.put("T Amplitude", leadMeasurements.getTamp());
+			annotationMappings.put("T Duration", leadMeasurements.getTdur());
+			annotationMappings.put("T Area", leadMeasurements.getTarea());
+			annotationMappings.put("T' Amplitude", leadMeasurements.getTpamp());
+			annotationMappings.put("T'' Amplitude", leadMeasurements.getTptpdur());
+			annotationMappings.put("T' Duration", leadMeasurements.getTpdur());
+			annotationMappings.put("T' Area", leadMeasurements.getTparea());
+			annotationMappings.put("T'' Area", leadMeasurements.getTptparea());
+			annotationMappings.put("PR Interval", leadMeasurements.getPrint());
+			annotationMappings.put("PR Segment", leadMeasurements.getPrseg());
+			annotationMappings.put("QT Interval", leadMeasurements.getQtint());
+			
+			return annotationMappings;
 		}
 		
 		private void generateWaveformAnnotations(String annotationName, String annotationValue) {

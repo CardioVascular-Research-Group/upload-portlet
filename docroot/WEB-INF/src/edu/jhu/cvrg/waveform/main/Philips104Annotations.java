@@ -57,14 +57,26 @@ public class Philips104Annotations {
 			LinkedHashMap<String, Object> groupMappings = this.extractGroupMeasurements(annotation);
 			
 			for(String key : groupMappings.keySet()) {
-				System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
+				//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
 				this.generateWaveformAnnotations(key, groupMappings.get(key).toString());
 			}
 		}
 	}
 	
 	private void populateLeadAnnotations() {
+		Leadmeasurements allLeadAnnotations = restingECG.getInternalmeasurements().getLeadmeasurements();
 		
+		List<Leadmeasurement> leadAnnotationGroup = allLeadAnnotations.getLeadmeasurement();
+		
+		for(Leadmeasurement annotation: leadAnnotationGroup) {
+			System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
+			LinkedHashMap<String, Object> leadMappings = this.extractLeadMeasurements(annotation);
+			
+			for(String key : leadMappings.keySet()) {
+				System.out.println("Annotation Name = " + key + " and value = " + leadMappings.get(key).toString());
+				this.generateWaveformAnnotations(key, leadMappings.get(key).toString());
+			}			
+		}
 	}
 	
 	private LinkedHashMap<String, Object> extractCrossleadElements(Crossleadmeasurements crossLeadAnnotations) {
@@ -168,63 +180,62 @@ public class Philips104Annotations {
 		annotationMappings.put("Transverse P Maximum Magnitude", crossLeadAnnotations.getTranspmaxmag());
 		annotationMappings.put("Transverse P Terminal Angle", crossLeadAnnotations.getTransptermangle());
 		annotationMappings.put("Transverse P Terminal Magnitude", crossLeadAnnotations.getTransptermmag());
-		annotationMappings.put("Transverse qrscwrot", crossLeadAnnotations.getTransqrscwrot());
-		annotationMappings.put("transqrsinitangle", crossLeadAnnotations.getTransqrsinitangle());
-		annotationMappings.put("transqrsinitmag", crossLeadAnnotations.getTransqrsinitmag());
-		annotationMappings.put("transqrsmaxangle", crossLeadAnnotations.getTransqrsmaxangle());
-		annotationMappings.put("transqrsmaxmag", crossLeadAnnotations.getTransqrsmaxmag());
-		annotationMappings.put("transqrstermangle", crossLeadAnnotations.getTransqrstermangle());
-		annotationMappings.put("transqrstermmag", crossLeadAnnotations.getTransqrstermmag());
-		annotationMappings.put("transtcwrot", crossLeadAnnotations.getTranstcwrot());
-		annotationMappings.put("transtinitangle", crossLeadAnnotations.getTranstinitangle());
-		annotationMappings.put("transtinitmag", crossLeadAnnotations.getTranstinitmag());
-		annotationMappings.put("transtinitmag", crossLeadAnnotations.getTranstinitmag());
-		annotationMappings.put("transtmaxangle", crossLeadAnnotations.getTranstmaxangle());
-		annotationMappings.put("transtmaxmag", crossLeadAnnotations.getTranstmaxmag());
-		annotationMappings.put("transttermangle", crossLeadAnnotations.getTransttermangle());
-		annotationMappings.put("transttermmag", crossLeadAnnotations.getTransttermmag());
-		annotationMappings.put("frontpcwrot", crossLeadAnnotations.getFrontpcwrot());
-		annotationMappings.put("frontpinitangle", crossLeadAnnotations.getFrontpinitangle());
-		annotationMappings.put("frontpinitmag", crossLeadAnnotations.getFrontpinitmag());
-		annotationMappings.put("frontpmaxangle", crossLeadAnnotations.getFrontpmaxangle());
-		annotationMappings.put("frontpmaxmag", crossLeadAnnotations.getFrontpmaxmag());
-		annotationMappings.put("frontptermangle", crossLeadAnnotations.getFrontptermangle());
-		annotationMappings.put("frontptermmag", crossLeadAnnotations.getFrontptermmag());
-		annotationMappings.put("frontqrscwrot", crossLeadAnnotations.getFrontqrscwrot());
-		annotationMappings.put("frontqrsinitangle", crossLeadAnnotations.getFrontqrsinitangle());
-		annotationMappings.put("frontqrsinitmag", crossLeadAnnotations.getFrontqrsinitmag());
-		annotationMappings.put("frontqrsmaxangle", crossLeadAnnotations.getFrontqrsmaxangle());
-		annotationMappings.put("frontqrsmaxmag", crossLeadAnnotations.getFrontqrsmaxmag());
-		annotationMappings.put("frontqrstermangle", crossLeadAnnotations.getFrontqrstermangle());
-		annotationMappings.put("frontqrstermmag", crossLeadAnnotations.getFrontqrstermmag());
-		annotationMappings.put("fronttcwrot", crossLeadAnnotations.getFronttcwrot());
-		annotationMappings.put("fronttinitangle", crossLeadAnnotations.getFronttinitangle());
-		annotationMappings.put("fronttinitmag", crossLeadAnnotations.getFronttinitmag());
-		annotationMappings.put("fronttmaxangle", crossLeadAnnotations.getFronttmaxangle());
-		annotationMappings.put("fronttmaxmag", crossLeadAnnotations.getFronttmaxmag());
-		annotationMappings.put("frontttermangle", crossLeadAnnotations.getFrontttermangle());
-		annotationMappings.put("frontttermmag", crossLeadAnnotations.getFrontttermmag());
-		annotationMappings.put("sagpcwrot", crossLeadAnnotations.getSagpcwrot());
-		annotationMappings.put("sagpinitangle", crossLeadAnnotations.getSagpinitangle());
-		annotationMappings.put("sagpinitmag", crossLeadAnnotations.getSagpinitmag());
-		annotationMappings.put("sagpmaxangle", crossLeadAnnotations.getSagpmaxangle());
-		annotationMappings.put("sagpmaxmag", crossLeadAnnotations.getSagpmaxmag());
-		annotationMappings.put("sagptermangle", crossLeadAnnotations.getSagptermangle());
-		annotationMappings.put("sagptermmag", crossLeadAnnotations.getSagptermmag());
-		annotationMappings.put("sagqrscwrot", crossLeadAnnotations.getSagqrscwrot());
-		annotationMappings.put("sagqrsinitangle", crossLeadAnnotations.getSagqrsinitangle());
-		annotationMappings.put("sagqrsinitmag", crossLeadAnnotations.getSagqrsinitmag());
-		annotationMappings.put("sagqrsmaxangle", crossLeadAnnotations.getSagqrsmaxangle());
-		annotationMappings.put("sagqrsmaxmag", crossLeadAnnotations.getSagqrsmaxmag());
-		annotationMappings.put("sagqrstermangle", crossLeadAnnotations.getSagqrstermangle());
-		annotationMappings.put("sagqrstermmag", crossLeadAnnotations.getSagqrstermmag());
-		annotationMappings.put("sagtcwrot", crossLeadAnnotations.getSagtcwrot());
-		annotationMappings.put("sagtinitangle", crossLeadAnnotations.getSagtinitangle());
-		annotationMappings.put("sagtinitmag", crossLeadAnnotations.getSagtinitmag());
-		annotationMappings.put("sagtmaxangle", crossLeadAnnotations.getSagtmaxangle());
-		annotationMappings.put("sagtmaxmag", crossLeadAnnotations.getSagtmaxmag());
-		annotationMappings.put("sagttermangle", crossLeadAnnotations.getSagttermangle());
-		annotationMappings.put("sagttermmag", crossLeadAnnotations.getSagttermmag());
+		annotationMappings.put("Transverse QRS Clockwise Rotation", crossLeadAnnotations.getTransqrscwrot());
+		annotationMappings.put("Transverse QRS Initial Angle", crossLeadAnnotations.getTransqrsinitangle());
+		annotationMappings.put("Transverse QRS Initial Magnitude", crossLeadAnnotations.getTransqrsinitmag());
+		annotationMappings.put("Transverse QRS Maximum Angle", crossLeadAnnotations.getTransqrsmaxangle());
+		annotationMappings.put("Transverse QRS Maximum Magnitude", crossLeadAnnotations.getTransqrsmaxmag());
+		annotationMappings.put("Transverse QRS Terminal Angle", crossLeadAnnotations.getTransqrstermangle());
+		annotationMappings.put("Transverse QRS Terminal Magnitude", crossLeadAnnotations.getTransqrstermmag());
+		annotationMappings.put("Transverse T Clockwise Rotation", crossLeadAnnotations.getTranstcwrot());
+		annotationMappings.put("Transverse T Initial Angle", crossLeadAnnotations.getTranstinitangle());
+		annotationMappings.put("Transverse T Initial Magnitude", crossLeadAnnotations.getTranstinitmag());
+		annotationMappings.put("Transverse T Maximum Angle", crossLeadAnnotations.getTranstmaxangle());
+		annotationMappings.put("Transverse T Maximum Magnitude", crossLeadAnnotations.getTranstmaxmag());
+		annotationMappings.put("Transverse T Terminal Angle", crossLeadAnnotations.getTransttermangle());
+		annotationMappings.put("Transverse T Terminal Magnitude", crossLeadAnnotations.getTransttermmag());
+		annotationMappings.put("Frontal P Clockwise Rotation", crossLeadAnnotations.getFrontpcwrot());
+		annotationMappings.put("Frontal P Initial Angle", crossLeadAnnotations.getFrontpinitangle());
+		annotationMappings.put("Frontal P Initial Magnitude", crossLeadAnnotations.getFrontpinitmag());
+		annotationMappings.put("Frontal P Maximum Angle", crossLeadAnnotations.getFrontpmaxangle());
+		annotationMappings.put("Frontal P Maximum Magnitude", crossLeadAnnotations.getFrontpmaxmag());
+		annotationMappings.put("Frontal P Terminal Angle", crossLeadAnnotations.getFrontptermangle());
+		annotationMappings.put("Frontal P Terminal Magnitude", crossLeadAnnotations.getFrontptermmag());
+		annotationMappings.put("Frontal QRS Clockwise Rotation", crossLeadAnnotations.getFrontqrscwrot());
+		annotationMappings.put("Frontal QRS Initial Angle", crossLeadAnnotations.getFrontqrsinitangle());
+		annotationMappings.put("Frontal QRS Initial Magnitude", crossLeadAnnotations.getFrontqrsinitmag());
+		annotationMappings.put("Frontal QRS Maximum Angle", crossLeadAnnotations.getFrontqrsmaxangle());
+		annotationMappings.put("Frontal QRS Maximum Magnitude", crossLeadAnnotations.getFrontqrsmaxmag());
+		annotationMappings.put("Frontal QRS Terminal Angle", crossLeadAnnotations.getFrontqrstermangle());
+		annotationMappings.put("Frontal QRS Terminal Magnitude", crossLeadAnnotations.getFrontqrstermmag());
+		annotationMappings.put("Frontal T Clockwise Rotation", crossLeadAnnotations.getFronttcwrot());
+		annotationMappings.put("Frontal T Initial Angle", crossLeadAnnotations.getFronttinitangle());
+		annotationMappings.put("Frontal T Initial Magnitude", crossLeadAnnotations.getFronttinitmag());
+		annotationMappings.put("Front T Maximum Angle", crossLeadAnnotations.getFronttmaxangle());
+		annotationMappings.put("Front T Maximum Magnitude", crossLeadAnnotations.getFronttmaxmag());
+		annotationMappings.put("Front T Terminal Angle", crossLeadAnnotations.getFrontttermangle());
+		annotationMappings.put("Front T Terminal Magnitude", crossLeadAnnotations.getFrontttermmag());
+		annotationMappings.put("Saggital P Clockwise Rotation", crossLeadAnnotations.getSagpcwrot());
+		annotationMappings.put("Saggital P Initial Angle", crossLeadAnnotations.getSagpinitangle());
+		annotationMappings.put("Saggital P Initial Magnitude", crossLeadAnnotations.getSagpinitmag());
+		annotationMappings.put("Saggital P Maximum Angle", crossLeadAnnotations.getSagpmaxangle());
+		annotationMappings.put("Saggital P Maximum Magnitude", crossLeadAnnotations.getSagpmaxmag());
+		annotationMappings.put("Saggital P Terminal Angle", crossLeadAnnotations.getSagptermangle());
+		annotationMappings.put("Saggital P Terminal Magnitude", crossLeadAnnotations.getSagptermmag());
+		annotationMappings.put("Saggital QRS Clockwise Rotation", crossLeadAnnotations.getSagqrscwrot());
+		annotationMappings.put("Saggital QRS Initial Angle", crossLeadAnnotations.getSagqrsinitangle());
+		annotationMappings.put("Saggital QRS Initial Magnitude", crossLeadAnnotations.getSagqrsinitmag());
+		annotationMappings.put("Saggital QRS Maximum Angle", crossLeadAnnotations.getSagqrsmaxangle());
+		annotationMappings.put("Saggital QRS Maximum Magnitude", crossLeadAnnotations.getSagqrsmaxmag());
+		annotationMappings.put("Saggital QRS Terminal Angle", crossLeadAnnotations.getSagqrstermangle());
+		annotationMappings.put("Saggital QRS Terminal Magnitude", crossLeadAnnotations.getSagqrstermmag());
+		annotationMappings.put("Saggital T Clockwise Rotation", crossLeadAnnotations.getSagtcwrot());
+		annotationMappings.put("Saggital T Initial Angle", crossLeadAnnotations.getSagtinitangle());
+		annotationMappings.put("Saggital T Initial Magnitude", crossLeadAnnotations.getSagtinitmag());
+		annotationMappings.put("Saggital T Maximum Angle", crossLeadAnnotations.getSagtmaxangle());
+		annotationMappings.put("Saggital T Maximum Magnitude", crossLeadAnnotations.getSagtmaxmag());
+		annotationMappings.put("Saggital T Terminal Angle", crossLeadAnnotations.getSagttermangle());
+		annotationMappings.put("Saggital T Terminal Magnitude", crossLeadAnnotations.getSagttermmag());
 		
 		annotationMappings.put("preexcitation", crossLeadAnnotations.getPreexcitation());
 		
@@ -241,30 +252,77 @@ public class Philips104Annotations {
 	private LinkedHashMap<String, Object> extractGroupMeasurements(Groupmeasurement groupMeasurements) {
 		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
 		
-		annotationMappings.put("membercount", groupMeasurements.getMembercount());
-		annotationMappings.put("memberpercent", groupMeasurements.getMemberpercent());
-		annotationMappings.put("longestrun", groupMeasurements.getLongestrun());
-		annotationMappings.put("meanqrsdur", groupMeasurements.getMeanqrsdur());
-		annotationMappings.put("lowventrate", groupMeasurements.getLowventrate());
-		annotationMappings.put("meanventrate", groupMeasurements.getMeanventrate());
-		annotationMappings.put("highventrate", groupMeasurements.getHighventrate());
-		annotationMappings.put("ventratestddev", groupMeasurements.getVentratestddev());
-		annotationMappings.put("meanrrint", groupMeasurements.getMeanrrint());
-		annotationMappings.put("atrialrate", groupMeasurements.getAtrialrate());
-		annotationMappings.put("atrialratestdev", groupMeasurements.getAtrialratestddev());
+		annotationMappings.put("Member Count", groupMeasurements.getMembercount());
+		annotationMappings.put("Member Percent", groupMeasurements.getMemberpercent());
+		annotationMappings.put("Longest Run", groupMeasurements.getLongestrun());
+		annotationMappings.put("mean QRS Duration", groupMeasurements.getMeanqrsdur());
+		annotationMappings.put("Minimum Ventricular Rate", groupMeasurements.getLowventrate());
+		annotationMappings.put("Mean Ventricular Rate", groupMeasurements.getMeanventrate());
+		annotationMappings.put("Maximum Ventricular Rate", groupMeasurements.getHighventrate());
+		annotationMappings.put("Ventricular Rate Standard Deviation", groupMeasurements.getVentratestddev());
+		annotationMappings.put("Mean RR Interval", groupMeasurements.getMeanrrint());
+		annotationMappings.put("Atrial Rate", groupMeasurements.getAtrialrate());
+		annotationMappings.put("Atrial Rate Standard Deviation", groupMeasurements.getAtrialratestddev());
 		annotationMappings.put("avgpcount", groupMeasurements.getAvgpcount());
 		annotationMappings.put("notavgbeats", groupMeasurements.getNotavgpbeats());
-		annotationMappings.put("lowprint", groupMeasurements.getLowprint());
-		annotationMappings.put("meanprint", groupMeasurements.getMeanprint());
-		annotationMappings.put("highprint", groupMeasurements.getHighprint());
-		annotationMappings.put("printstddev", groupMeasurements.getPrintstddev());
-		annotationMappings.put("meanprseg", groupMeasurements.getMeanprseg());
-		annotationMappings.put("meanqtint", groupMeasurements.getMeanqtint());
-		annotationMappings.put("meanqtseg", groupMeasurements.getMeanqtseg());
+		annotationMappings.put("Minimum PR Interval", groupMeasurements.getLowprint());
+		annotationMappings.put("Mean PR Interval", groupMeasurements.getMeanprint());
+		annotationMappings.put("High PR Interval", groupMeasurements.getHighprint());
+		annotationMappings.put("PR Interval Standard Deviation", groupMeasurements.getPrintstddev());
+		annotationMappings.put("Mean PR Segment", groupMeasurements.getMeanprseg());
+		annotationMappings.put("Mean QT Interval", groupMeasurements.getMeanqtint());
+		annotationMappings.put("Mean QT Segment", groupMeasurements.getMeanqtseg());
 		annotationMappings.put("comppausecount", groupMeasurements.getComppausecount());
 		
 		return annotationMappings;
 		
+	}
+	
+	private LinkedHashMap<String, Object> extractLeadMeasurements(Leadmeasurement leadMeasurements) {
+		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();
+		
+		annotationMappings.put("P Amplitude", leadMeasurements.getPamp());
+		annotationMappings.put("P Duration", leadMeasurements.getPdur());
+		annotationMappings.put("P Area", leadMeasurements.getParea());
+		annotationMappings.put("P' Amplitude", leadMeasurements.getPpamp());
+		annotationMappings.put("P' Duration", leadMeasurements.getPpdur());
+		annotationMappings.put("P'' Duration", leadMeasurements.getPpppdur());
+		annotationMappings.put("P' Area", leadMeasurements.getPparea());
+		annotationMappings.put("P'' Area", leadMeasurements.getPppparea());
+		annotationMappings.put("Q Amplitude", leadMeasurements.getQamp());
+		annotationMappings.put("Q Duration", leadMeasurements.getQdur());
+		annotationMappings.put("R Amplitude", leadMeasurements.getRamp());
+		annotationMappings.put("R Duration", leadMeasurements.getRdur());
+		annotationMappings.put("S Amplitude", leadMeasurements.getSamp());
+		annotationMappings.put("S Duration", leadMeasurements.getSdur());
+		annotationMappings.put("R' Amplitude", leadMeasurements.getRpamp());
+		annotationMappings.put("R' Duration", leadMeasurements.getRpdur());
+		annotationMappings.put("S' Amplitude", leadMeasurements.getSpamp());
+		annotationMappings.put("S' Duration", leadMeasurements.getSpdur());
+		annotationMappings.put("Ventricular Activation Time", leadMeasurements.getVat());
+		annotationMappings.put("QRS Amplitude", leadMeasurements.getQrsppk());
+		annotationMappings.put("QRS Duration", leadMeasurements.getQrsdur());
+		annotationMappings.put("QRS Area", leadMeasurements.getQrsarea());
+		annotationMappings.put("ST Segment Onset", leadMeasurements.getSton());
+		annotationMappings.put("ST Segment Midpoint", leadMeasurements.getStmid());
+		annotationMappings.put("ST Segment Offset", leadMeasurements.getStend());
+		annotationMappings.put("ST Segment Duration", leadMeasurements.getStdur());
+		annotationMappings.put("ST Segment Slope", leadMeasurements.getStslope());
+		annotationMappings.put("ST Segment Shape", leadMeasurements.getStshape());
+		annotationMappings.put("T Amplitude", leadMeasurements.getTamp());
+		annotationMappings.put("T Duration", leadMeasurements.getTdur());
+		annotationMappings.put("T Area", leadMeasurements.getTarea());
+		annotationMappings.put("T' Amplitude", leadMeasurements.getTpamp());
+		annotationMappings.put("T'' Amplitude", leadMeasurements.getTptpdur());
+		annotationMappings.put("T' Duration", leadMeasurements.getTpdur());
+		annotationMappings.put("T' Area", leadMeasurements.getTparea());
+		annotationMappings.put("T'' Area", leadMeasurements.getTptparea());
+		annotationMappings.put("PR Interval", leadMeasurements.getPrint());
+		annotationMappings.put("PR Segment", leadMeasurements.getPrseg());
+		annotationMappings.put("QT Interval", leadMeasurements.getQtint());
+		
+		
+		return annotationMappings;		
 	}
 	
 	private void generateWaveformAnnotations(String annotationName, String annotationValue) {
