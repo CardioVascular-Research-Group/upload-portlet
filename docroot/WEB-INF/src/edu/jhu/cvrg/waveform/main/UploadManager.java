@@ -18,6 +18,8 @@ limitations under the License.
 * @author Chris Jurado, Mike Shipway, Brandon Benitez
 * 
 */
+
+
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -34,6 +36,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -66,7 +69,9 @@ import org.cvrgrid.philips.jaxb.schema.*;
 import com.liferay.portal.model.User;
 
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
+import edu.jhu.cvrg.waveform.model.AnnotationData;
 import edu.jhu.cvrg.waveform.model.StudyEntry;
+import edu.jhu.cvrg.waveform.utility.AnnotationUtility;
 import edu.jhu.cvrg.waveform.utility.EnumFileType;
 import edu.jhu.cvrg.waveform.utility.FTPUtility;
 import edu.jhu.cvrg.waveform.utility.MetaContainer;
@@ -358,9 +363,30 @@ public class UploadManager {
 					com.liferay.util.portlet.PortletProps.get("dbURI"),	
 					com.liferay.util.portlet.PortletProps.get("dbDriver"), 
 					com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
+			
 			utility.storeFileMetaData(metaData);
 			
-			// Create instances of the appropriate class for extracting annotations if it is a Philips or Muse file
+			// Now do annotations from Muse or Philips files
+			if(fileType == EnumFileType.PHIL103) {
+				ProcessPhilips103 phil103Ann = new ProcessPhilips103(philipsECG103, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
+				phil103Ann.populateAnnotations();
+				
+				ArrayList<AnnotationData> globalList = phil103Ann.getGlobalAnnotations();
+				ArrayList<AnnotationData[]> leadList = phil103Ann.getLeadAnnotations();
+				
+				convertNonLeadAnnotations(globalList, "");
+				convertLeadAnnotations(leadList);
+			}
+			else if(fileType == EnumFileType.PHIL104) {
+				ProcessPhilips104 phil104Ann = new ProcessPhilips104(philipsECG104, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
+				phil104Ann.populateAnnotations();
+				
+				ArrayList<AnnotationData> globalList = phil104Ann.getCrossleadAnnotations();
+				ArrayList<AnnotationData[]> leadList = phil104Ann.getLeadAnnotations();
+				
+				convertNonLeadAnnotations(globalList, "");
+				convertLeadAnnotations(leadList);
+			}
 			
 	}
 
@@ -608,6 +634,49 @@ public class UploadManager {
 				}
 			}
 		}
+	}
+	
+	public static void convertAnnotations(AnnotationData[] annotationArray, boolean isLeadAnnotation, String groupName) throws UploadFailureException {
+		//AnnotationUtility dbAnnUtility = new AnnotationUtility("waveformUser", "d@rks0uls!", "xmldb:exist://128.220.76.161:8080/exist-1.4.2-rev16251/xmlrpc", "org.exist.xmldb.DatabaseImpl", "/db/waveformrecords");
+		AnnotationUtility dbAnnUtility = new AnnotationUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
+				com.liferay.util.portlet.PortletProps.get("dbPassword"), 
+				com.liferay.util.portlet.PortletProps.get("dbURI"),	
+				com.liferay.util.portlet.PortletProps.get("dbDriver"), 
+				com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
+		
+		for(AnnotationData annData : annotationArray) {			
+			boolean success = true;
+			
+			if(isLeadAnnotation) {
+				System.out.println("Storing lead index " + annData.getLeadIndex());
+				success = dbAnnUtility.storeLeadAnnotationNode(annData);
+				
+			}
+			else {
+				success = dbAnnUtility.storeComment(annData);
+			}
+			
+			if(!success) {
+				throw new UploadFailureException("Annotations for Philips file failed to enter the database properly");
+			}
+		}
+	}
+	
+	private void convertLeadAnnotations(ArrayList<AnnotationData[]> allLeadAnnotations) throws UploadFailureException {
+		for(int i=0; i<allLeadAnnotations.size(); i++) {
+			if(allLeadAnnotations.get(i).length != 0) {
+				System.out.println("There are annotations in this lead.  The size is " + allLeadAnnotations.get(i).length);
+				convertAnnotations(allLeadAnnotations.get(i), true, "");
+			}
+		}
+	}
+	
+	private void convertNonLeadAnnotations(ArrayList<AnnotationData> allAnnotations, String groupName) throws UploadFailureException {
+		AnnotationData[] annotationArray = new AnnotationData[allAnnotations.size()];
+		annotationArray = allAnnotations.toArray(annotationArray);
+		
+		
+		convertAnnotations(annotationArray, false, groupName);
 	}
 	
 	
