@@ -18,7 +18,9 @@ import edu.jhu.cvrg.waveform.model.AnnotationData;
  *
  */
 public class ProcessPhilips103 {
-	Restingecgdata restingECG;
+	private Restingecgdata restingECG;
+	private ArrayList<AnnotationData> orderAnnotationsList;
+	private ArrayList<AnnotationData> dataAcquisitionList;
 	private ArrayList<AnnotationData> globalAnnotationsList;
 	private ArrayList<AnnotationData[]> groupAnnotationsList;
 	private ArrayList<AnnotationData[]> leadAnnotationsList;
@@ -32,6 +34,8 @@ public class ProcessPhilips103 {
 	public ProcessPhilips103(Restingecgdata newECG, String newStudyID, String newUserID, String newRecordName, String newSubjectID) {
 		restingECG = newECG;
 		annotationRetriever = new Philips103Annotations();
+		orderAnnotationsList = new ArrayList<AnnotationData>();
+		dataAcquisitionList = new ArrayList<AnnotationData>();
 		globalAnnotationsList = new ArrayList<AnnotationData>();
 		groupAnnotationsList = new ArrayList<AnnotationData[]>();
 		leadAnnotationsList = new ArrayList<AnnotationData[]>();
@@ -51,6 +55,14 @@ public class ProcessPhilips103 {
 		return restingECG;
 	}
 	
+	public ArrayList<AnnotationData> getOrderInfo() {
+		return orderAnnotationsList;
+	}
+	
+	public ArrayList<AnnotationData> getDataAcquisitions() {
+		return dataAcquisitionList;
+	}
+	
 	public ArrayList<AnnotationData> getGlobalAnnotations() {
 		return globalAnnotationsList;
 	}
@@ -65,12 +77,82 @@ public class ProcessPhilips103 {
 	
 	public void populateAnnotations() {
 		
-		this.processGlobalAnnotations();
-		this.processGroupAnnotations();
-		this.processLeadAnnotations();
+		this.extractOrderInformation();
+		this.processDataAcquisition();
+		// Note:  Checks for null in each individual method are not needed.  These are required
+		// in the schema for this version of Philips 
+		if(restingECG.getMeasurements() != null) {
+			this.processGlobalAnnotations();
+			this.processGroupAnnotations();
+			this.processLeadAnnotations();
+		}
 	}
 	
+	private void extractOrderInformation() {
+		Orderinfo orderinfoAnn = restingECG.getOrderinfo();
+		if(orderinfoAnn != null) {
+			LinkedHashMap<String, Object> orderMappings = annotationRetriever.extractOrderInfo(orderinfoAnn);
+			
+			for(String key : orderMappings.keySet()) {
+				if((orderMappings.get(key) != null)) {
+					//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
+					AnnotationData annData = new AnnotationData();
+					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
+					annData.setIsSinglePoint(true);
+					annData.setStudyID(studyID);
+					annData.setSubjectID(subjectID);
+					annData.setUserID(userID);
+					annData.setDatasetName(recordName);
+					annData.setAnnotation(orderMappings.get(key).toString());
+					annData.setConceptLabel(key);
+					annData.setCreator(createdBy);
+					
+					Random randomNum = new Random();
+					
+					long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
+					String ms = String.valueOf(randomID);  // used for GUID
+					annData.setUniqueID(ms);
+					
+					
+					orderAnnotationsList.add(annData);
+				}
+			}
+		}
+	}
 	
+	private void processDataAcquisition() {
+		Dataacquisition dataAcquisAnn = restingECG.getDataacquisition();
+
+		//  This one is does not have a check for null since Data Acquisition is a required tag in the Schema
+		LinkedHashMap<String, Object> dataMappings = annotationRetriever.extractDataAcquisition(dataAcquisAnn);
+		
+		System.out.println("Size of hashmap = " + dataMappings.size());
+		
+		for(String key : dataMappings.keySet()) {
+			if((dataMappings.get(key) != null)) {
+				//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
+				AnnotationData annData = new AnnotationData();
+				annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
+				annData.setIsSinglePoint(true);
+				annData.setStudyID(studyID);
+				annData.setSubjectID(subjectID);
+				annData.setUserID(userID);
+				annData.setDatasetName(recordName);
+				annData.setAnnotation(dataMappings.get(key).toString());
+				annData.setConceptLabel(key);
+				annData.setCreator(createdBy);
+				
+				Random randomNum = new Random();
+				
+				long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
+				String ms = String.valueOf(randomID);  // used for GUID
+				annData.setUniqueID(ms);
+				
+				
+				dataAcquisitionList.add(annData);
+			}
+		}
+	}
 	
 	private void processGlobalAnnotations() {
 		Globalmeasurements globalAnnotations = restingECG.getMeasurements().getGlobalmeasurements();

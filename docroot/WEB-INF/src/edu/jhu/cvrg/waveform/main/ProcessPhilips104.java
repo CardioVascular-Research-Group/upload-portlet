@@ -19,6 +19,8 @@ import edu.jhu.cvrg.waveform.utility.AnnotationUtility;
  */
 public class ProcessPhilips104 {
 	private Restingecgdata restingECG;
+	private ArrayList<AnnotationData> orderinfoList;
+	private ArrayList<AnnotationData> dataAcquisitionList;
 	private ArrayList<AnnotationData> crossleadAnnotationsList;
 	private ArrayList<AnnotationData[]> groupAnnotationsList;
 	private ArrayList<AnnotationData[]> leadAnnotationsList;
@@ -32,6 +34,8 @@ public class ProcessPhilips104 {
 	public ProcessPhilips104(Restingecgdata newECG, String newStudyID, String newUserID, String newRecordName, String newSubjectID) {
 		restingECG = newECG;
 		annotationRetriever = new Philips104Annotations();
+		orderinfoList = new ArrayList<AnnotationData>();
+		dataAcquisitionList = new ArrayList<AnnotationData>();
 		crossleadAnnotationsList = new ArrayList<AnnotationData>();
 		groupAnnotationsList = new ArrayList<AnnotationData[]>();
 		leadAnnotationsList = new ArrayList<AnnotationData[]>();
@@ -50,6 +54,14 @@ public class ProcessPhilips104 {
 		return restingECG;
 	}
 	
+	public ArrayList<AnnotationData> getOrderInfo() {
+		return orderinfoList;
+	}
+	
+	public ArrayList<AnnotationData> getDataAcquisitions() {
+		return dataAcquisitionList;
+	}
+	
 	public ArrayList<AnnotationData> getCrossleadAnnotations() {
 		return crossleadAnnotationsList;
 	}
@@ -64,29 +76,64 @@ public class ProcessPhilips104 {
 	
 	public void populateAnnotations() {
 		
+		System.out.println("Entering Populate Annotations");
 		
-		this.processCrossleadAnnotations();
-		this.processGroupAnnotations();
-		this.processLeadAnnotations();
+		this.extractOrderInformation();
+		this.processDataAcquisition();
+		if(restingECG.getInternalmeasurements() != null) {
+			this.processCrossleadAnnotations();
+			this.processGroupAnnotations();
+			this.processLeadAnnotations();
+		}
 	}
 	
 	
 	
-	private void getOrderInformation() {
+	private void extractOrderInformation() {
+		Orderinfo orderinfoAnn = restingECG.getOrderinfo();
 		
+		if(orderinfoAnn != null) {
+			LinkedHashMap<String, Object> orderMappings = annotationRetriever.extractOrderInfo(orderinfoAnn);
+			
+			System.out.println("Size of hashmap = " + orderMappings.size());
+			
+			for(String key : orderMappings.keySet()) {
+				if((orderMappings.get(key) != null)) {
+					//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
+					AnnotationData annData = new AnnotationData();
+					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
+					annData.setIsSinglePoint(true);
+					annData.setStudyID(studyID);
+					annData.setSubjectID(subjectID);
+					annData.setUserID(userID);
+					annData.setDatasetName(recordName);
+					annData.setAnnotation(orderMappings.get(key).toString());
+					annData.setConceptLabel(key);
+					annData.setCreator(createdBy);
+					
+					Random randomNum = new Random();
+					
+					long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
+					String ms = String.valueOf(randomID);  // used for GUID
+					annData.setUniqueID(ms);
+					
+					
+					orderinfoList.add(annData);
+				}
+			}
+		}
 	}
 	
-	private void getReportInformation() {
+	private void processDataAcquisition() {
+		Dataacquisition dataAcquisAnn = restingECG.getDataacquisition();
 		
-	}
-	
-	private void processCrossleadAnnotations() {
-		Crossleadmeasurements crossAnnotations = restingECG.getInternalmeasurements().getCrossleadmeasurements();
+		//  This one is does not have a check for null since Data Acquisition is a required tag in the Schema
+		LinkedHashMap<String, Object> dataMappings = annotationRetriever.extractDataAcquisition(dataAcquisAnn);
 		
-		LinkedHashMap<String, Object> annotationMappings = annotationRetriever.extractCrossleadElements(crossAnnotations);
+		System.out.println("Size of hashmap = " + dataMappings.size());
 		
-		for(String key : annotationMappings.keySet()) {
-			if((annotationMappings.get(key) != null)) {
+		for(String key : dataMappings.keySet()) {
+			if((dataMappings.get(key) != null)) {
 				//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
 				AnnotationData annData = new AnnotationData();
 				annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
@@ -95,7 +142,7 @@ public class ProcessPhilips104 {
 				annData.setSubjectID(subjectID);
 				annData.setUserID(userID);
 				annData.setDatasetName(recordName);
-				annData.setAnnotation(annotationMappings.get(key).toString());
+				annData.setAnnotation(dataMappings.get(key).toString());
 				annData.setConceptLabel(key);
 				annData.setCreator(createdBy);
 				
@@ -106,92 +153,128 @@ public class ProcessPhilips104 {
 				annData.setUniqueID(ms);
 				
 				
-				crossleadAnnotationsList.add(annData);
+				dataAcquisitionList.add(annData);
 			}
 		}
+	}
+	
+	private void processCrossleadAnnotations() {
+		Crossleadmeasurements crossAnnotations = restingECG.getInternalmeasurements().getCrossleadmeasurements();
 		
+		if(crossAnnotations != null) {
+			LinkedHashMap<String, Object> annotationMappings = annotationRetriever.extractCrossleadElements(crossAnnotations);
+			
+			for(String key : annotationMappings.keySet()) {
+				if((annotationMappings.get(key) != null)) {
+					//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
+					AnnotationData annData = new AnnotationData();
+					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
+					annData.setIsSinglePoint(true);
+					annData.setStudyID(studyID);
+					annData.setSubjectID(subjectID);
+					annData.setUserID(userID);
+					annData.setDatasetName(recordName);
+					annData.setAnnotation(annotationMappings.get(key).toString());
+					annData.setConceptLabel(key);
+					annData.setCreator(createdBy);
+					
+					Random randomNum = new Random();
+					
+					long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
+					String ms = String.valueOf(randomID);  // used for GUID
+					annData.setUniqueID(ms);
+					
+					
+					crossleadAnnotationsList.add(annData);
+				}
+			}
+		}
 	}
 	
 	private void processGroupAnnotations() {
 		Groupmeasurements allGroupAnnotations = restingECG.getInternalmeasurements().getGroupmeasurements();
 		
-		List<Groupmeasurement> groupAnnotation = allGroupAnnotations.getGroupmeasurement();
-		
-		for(Groupmeasurement annotation : groupAnnotation) {
-			LinkedHashMap<String, Object> groupMappings = annotationRetriever.extractGroupMeasurements(annotation);
-			AnnotationData[] annotationsToAdd = new AnnotationData[groupMappings.size()];
-			int index = 0;
+		if(allGroupAnnotations != null) {
+			List<Groupmeasurement> groupAnnotation = allGroupAnnotations.getGroupmeasurement();
 			
-			for(String key : groupMappings.keySet()) {
-				//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
-				System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
-				AnnotationData annData = new AnnotationData();
-				annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
-				annData.setIsSinglePoint(true);
-				annData.setStudyID(studyID);
-				annData.setSubjectID(subjectID);
-				annData.setUserID(userID);
-				annData.setDatasetName(recordName);
-				annData.setAnnotation(groupMappings.get(key).toString());
-				annData.setConceptLabel(key);
-				annData.setCreator(createdBy);
+			for(Groupmeasurement annotation : groupAnnotation) {
+				LinkedHashMap<String, Object> groupMappings = annotationRetriever.extractGroupMeasurements(annotation);
+				AnnotationData[] annotationsToAdd = new AnnotationData[groupMappings.size()];
+				int index = 0;
 				
-				Random randomNum = new Random();
+				for(String key : groupMappings.keySet()) {
+					//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
+					System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
+					AnnotationData annData = new AnnotationData();
+					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
+					annData.setIsSinglePoint(true);
+					annData.setStudyID(studyID);
+					annData.setSubjectID(subjectID);
+					annData.setUserID(userID);
+					annData.setDatasetName(recordName);
+					annData.setAnnotation(groupMappings.get(key).toString());
+					annData.setConceptLabel(key);
+					annData.setCreator(createdBy);
+					
+					Random randomNum = new Random();
+					
+					long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
+					String ms = String.valueOf(randomID);  // used for GUID
+					annData.setUniqueID(ms);
+					
+					
+					annotationsToAdd[index] = annData;
+					
+					index++;
+				}
 				
-				long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
-				String ms = String.valueOf(randomID);  // used for GUID
-				annData.setUniqueID(ms);
-				
-				
-				annotationsToAdd[index] = annData;
-				
-				index++;
+				groupAnnotationsList.add(annotationsToAdd);
 			}
-			
-			groupAnnotationsList.add(annotationsToAdd);
 		}
 	}
 	
 	private void processLeadAnnotations() {
 		Leadmeasurements allLeadAnnotations = restingECG.getInternalmeasurements().getLeadmeasurements();
 		
-		List<Leadmeasurement> leadAnnotationGroup = allLeadAnnotations.getLeadmeasurement();
-		
-		int leadIndex = 0;
-		
-		for(Leadmeasurement annotation: leadAnnotationGroup) {
-			System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
-			LinkedHashMap<String, Object> leadMappings = annotationRetriever.extractLeadMeasurements(annotation);
-			AnnotationData[] annotationsToAdd = new AnnotationData[leadMappings.size()];
-			int arrayIndex = 0;
+		if(allLeadAnnotations != null) {
+			List<Leadmeasurement> leadAnnotationGroup = allLeadAnnotations.getLeadmeasurement();
 			
-			for(String key : leadMappings.keySet()) {
-				System.out.println("Annotation Name = " + key + " and value = " + leadMappings.get(key).toString());
-				AnnotationData annData = new AnnotationData();
-				annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
-				annData.setIsSinglePoint(true);
-				annData.setStudyID(studyID);
-				annData.setSubjectID(subjectID);
-				annData.setUserID(userID);
-				annData.setDatasetName(recordName);
-				annData.setAnnotation(leadMappings.get(key).toString());
-				annData.setConceptLabel(key);
-				annData.setCreator(createdBy);
-				annData.setLeadIndex(leadIndex);
+			int leadIndex = 0;
+			
+			for(Leadmeasurement annotation: leadAnnotationGroup) {
+				//System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
+				LinkedHashMap<String, Object> leadMappings = annotationRetriever.extractLeadMeasurements(annotation);
+				AnnotationData[] annotationsToAdd = new AnnotationData[leadMappings.size()];
+				int arrayIndex = 0;
 				
-				Random randomNum = new Random();
+				for(String key : leadMappings.keySet()) {
+					System.out.println("Annotation Name = " + key + " and value = " + leadMappings.get(key).toString());
+					AnnotationData annData = new AnnotationData();
+					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
+					annData.setIsSinglePoint(true);
+					annData.setStudyID(studyID);
+					annData.setSubjectID(subjectID);
+					annData.setUserID(userID);
+					annData.setDatasetName(recordName);
+					annData.setAnnotation(leadMappings.get(key).toString());
+					annData.setConceptLabel(key);
+					annData.setCreator(createdBy);
+					annData.setLeadIndex(leadIndex);
+					
+					Random randomNum = new Random();
+					
+					long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
+					String ms = String.valueOf(randomID);  // used for GUID
+					annData.setUniqueID(ms);
+					
+					annotationsToAdd[arrayIndex] = annData;
+					
+					arrayIndex++;
+				}
 				
-				long randomID = java.lang.System.currentTimeMillis() * (long)randomNum.nextInt(10000);
-				String ms = String.valueOf(randomID);  // used for GUID
-				annData.setUniqueID(ms);
-				
-				annotationsToAdd[arrayIndex] = annData;
-				
-				arrayIndex++;
+				leadAnnotationsList.add(annotationsToAdd);
+				leadIndex++;
 			}
-			
-			leadAnnotationsList.add(annotationsToAdd);
-			leadIndex++;
 		}
 	}
 	

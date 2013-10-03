@@ -371,21 +371,29 @@ public class UploadManager {
 				ProcessPhilips103 phil103Ann = new ProcessPhilips103(philipsECG103, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
 				phil103Ann.populateAnnotations();
 				
+				ArrayList<AnnotationData> orderList = phil103Ann.getOrderInfo();
+				ArrayList<AnnotationData> dataList = phil103Ann.getDataAcquisitions();
 				ArrayList<AnnotationData> globalList = phil103Ann.getGlobalAnnotations();
 				ArrayList<AnnotationData[]> leadList = phil103Ann.getLeadAnnotations();
 				
 				convertNonLeadAnnotations(globalList, "");
 				convertLeadAnnotations(leadList);
+				convertNonLeadAnnotations(orderList, "");
+				convertNonLeadAnnotations(dataList, "");
 			}
 			else if(fileType == EnumFileType.PHIL104) {
 				ProcessPhilips104 phil104Ann = new ProcessPhilips104(philipsECG104, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
 				phil104Ann.populateAnnotations();
 				
+				ArrayList<AnnotationData> orderList = phil104Ann.getOrderInfo();
+				ArrayList<AnnotationData> dataList = phil104Ann.getDataAcquisitions();
 				ArrayList<AnnotationData> globalList = phil104Ann.getCrossleadAnnotations();
 				ArrayList<AnnotationData[]> leadList = phil104Ann.getLeadAnnotations();
 				
 				convertNonLeadAnnotations(globalList, "");
 				convertLeadAnnotations(leadList);
+				convertNonLeadAnnotations(orderList, "");
+				convertNonLeadAnnotations(dataList, "");
 			}
 			
 	}

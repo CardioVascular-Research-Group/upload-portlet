@@ -1,6 +1,7 @@
 package edu.jhu.cvrg.waveform.main;
 
 import org.cvrgrid.philips.jaxb.beans.*;
+import org.cvrgrid.philips.jaxb.beans.Orderinfo.Other;
 import org.cvrgrid.philips.jaxb.schema.*;
 import java.util.LinkedHashMap;
 
@@ -11,6 +12,91 @@ import java.util.LinkedHashMap;
 // Author: Brandon Benitez
 
 class Philips104Annotations {
+	
+	LinkedHashMap<String, Object> extractOrderInfo(Orderinfo orderinfoAnn) {
+		LinkedHashMap<String, Object> orderAnnsMap = new LinkedHashMap<String, Object>();
+		
+		orderAnnsMap.put("Order Number", orderinfoAnn.getOrdernumber());
+		orderAnnsMap.put("Unique Order ID", orderinfoAnn.getUniqueorderid());
+		orderAnnsMap.put("Order Billing Code", orderinfoAnn.getOrderbillingcode());
+		orderAnnsMap.put("Order Remarks", orderinfoAnn.getOrderremarks());
+		orderAnnsMap.put("Reason For Order", orderinfoAnn.getReasonfororder());
+		
+		int subscript = 1;
+		
+		for(Drgcategory drg : orderinfoAnn.getDrgcategories().getDrgcategory()) {
+			if(drg != null) {
+				String messageName = "drgcategories" + subscript;
+				orderAnnsMap.put(messageName, drg.getValue());
+				subscript++;
+			}
+		}
+		
+		orderAnnsMap.put("Order Status", orderinfoAnn.getOrderstatus());
+		orderAnnsMap.put("Inbox", orderinfoAnn.getInbox());
+		
+		subscript = 1;
+		
+		for(Other othr : orderinfoAnn.getOther()) {
+			if(othr != null) {
+				String messageName = "drgcategories" + subscript;
+				orderAnnsMap.put(messageName, othr.getValue());
+				subscript++;
+			}
+		}
+		
+		return orderAnnsMap;
+	}
+	
+	LinkedHashMap<String, Object> extractDataAcquisition(Dataacquisition dataAnnotations) {
+		LinkedHashMap<String, Object> dataMappings = new LinkedHashMap<String, Object>();
+		
+		dataMappings.put("Database ID", dataAnnotations.getDatabaseid());
+		dataMappings.put("Modality", dataAnnotations.getModality());
+		dataMappings.put("Machine", dataAnnotations.getMachine());
+		
+		// Now get the acquirer block in the XML
+		Acquirer acquirerAnn = dataAnnotations.getAcquirer(); 
+		
+		dataMappings.put("Acquirer Encounter ID", acquirerAnn.getEncounterid());
+		dataMappings.put("Operator", acquirerAnn.getOperator());
+		dataMappings.put("Room", acquirerAnn.getRoom());
+		dataMappings.put("Bed", acquirerAnn.getBed());
+		dataMappings.put("Department ID", acquirerAnn.getDepartmentid());
+		dataMappings.put("Department Name", acquirerAnn.getDepartmentname());
+		dataMappings.put("Institution ID", acquirerAnn.getInstitutionid());
+		dataMappings.put("Institution Name", acquirerAnn.getInstitutionname());
+		dataMappings.put("Facility ID", acquirerAnn.getFacilityid());
+		dataMappings.put("Facility Name", acquirerAnn.getFacilityname());
+		dataMappings.put("Ordering Clinician", acquirerAnn.getOrderingclinician());
+		dataMappings.put("Fellow", acquirerAnn.getFellow());
+		dataMappings.put("Attending Clinician", acquirerAnn.getAttendingclinician());
+		dataMappings.put("Referring Clinician", acquirerAnn.getReferringclinician());
+		dataMappings.put("Consulting Clinician", acquirerAnn.getConsultingclinician());
+		
+		// Retrieve the Signal Characteristics block.  The Sampling rate and number of channels
+		// information will not be gathered here, since those are being tracked elsewhere.
+		
+		Signalcharacteristics signalProperties = dataAnnotations.getSignalcharacteristics();
+		
+		dataMappings.put("Signal Resolution", signalProperties.getResolution());
+		dataMappings.put("High Pass Frequency", signalProperties.getHipass());
+		dataMappings.put("Low Pass Frequency", signalProperties.getLowpass());
+		dataMappings.put("AC Setting", signalProperties.getAcsetting());
+		dataMappings.put("Notch Filtered", signalProperties.getNotchfiltered());
+		dataMappings.put("Notch Filter Frequency", signalProperties.getNotchfilterfreqs());
+		dataMappings.put("Filtered ART", signalProperties.getArtfiltered());
+		dataMappings.put("Acquisition Type", signalProperties.getAcquisitiontype());
+		dataMappings.put("Other Acquisition Information", signalProperties.getOtheracquisitioninfo());
+		dataMappings.put("Bits Per Sample", signalProperties.getBitspersample());
+		dataMappings.put("Signal Offset", signalProperties.getSignaloffset());
+		dataMappings.put("Signal Signed", signalProperties.getSignalsigned());
+		dataMappings.put("Electrode Placement", signalProperties.getElectrodeplacement());
+		dataMappings.put("Other Placement Information", signalProperties.getOtherplacementinfo());
+		dataMappings.put("Number of Derived Leads", signalProperties.getDerivedleads());
+		
+		return dataMappings;
+	}
 	
 	LinkedHashMap<String, Object> extractCrossleadElements(Crossleadmeasurements crossLeadAnnotations) {
 		LinkedHashMap<String, Object> annotationMappings = new LinkedHashMap<String, Object>();

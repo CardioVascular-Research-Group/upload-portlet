@@ -1,7 +1,6 @@
 package edu.jhu.cvrg.waveform.main;
 
 
-
 import org.sierraecg.*;
 import org.sierraecg.schema.*;
 
@@ -13,6 +12,69 @@ import java.util.LinkedHashMap;
 //
 // Author: Brandon Benitez
 class Philips103Annotations {
+	
+	public LinkedHashMap<String, Object> extractOrderInfo(Orderinfo orderinfoAnn) {
+		LinkedHashMap<String, Object> orderAnnsMap = new LinkedHashMap<String, Object>();
+		
+		orderAnnsMap.put("Order Number", orderinfoAnn.getEncounterid());
+		orderAnnsMap.put("Operator ID", orderinfoAnn.getOperatorid());
+		orderAnnsMap.put("Order Number", orderinfoAnn.getOrdernumber());
+		orderAnnsMap.put("Viper Unique Order ID", orderinfoAnn.getViperuniqueorderid());
+		orderAnnsMap.put("Ordering Clinician Name", orderinfoAnn.getOrderingclinicianname());
+		orderAnnsMap.put("Ordering Clinician UPIN", orderinfoAnn.getOrderingclinicianUPIN());
+		orderAnnsMap.put("Reason For Order", orderinfoAnn.getReasonfororder());
+		
+		int subscript = 1;
+		
+		for(Drgcategory drg : orderinfoAnn.getDrgcategories().getDrgcategory()) {
+			if(drg != null) {
+				String messageName = "drgcategories" + subscript;
+				orderAnnsMap.put(messageName, drg.getValue());
+				subscript++;
+			}
+		}
+		
+		return orderAnnsMap;
+	}
+	
+	LinkedHashMap<String, Object> extractDataAcquisition(Dataacquisition dataAnnotations) {
+		LinkedHashMap<String, Object> dataMappings = new LinkedHashMap<String, Object>();
+		
+		dataMappings.put("Database ID", dataAnnotations.getEmsdatabaseid());
+		dataMappings.put("Machine", dataAnnotations.getMachine());
+		
+		// Now get the acquirer block in the XML
+		Acquirer acquirerAnn = dataAnnotations.getAcquirer(); 
+		
+		dataMappings.put("Acquirer Encounter ID", acquirerAnn.getEncounterid());
+		dataMappings.put("Acquirer Operator ID", acquirerAnn.getOperatorid());
+		dataMappings.put("Editing Operator ID", acquirerAnn.getEditingoperatorid());
+		dataMappings.put("Room", acquirerAnn.getRoom());
+		dataMappings.put("Department ID", acquirerAnn.getDepartmentid());
+		dataMappings.put("Department Name", acquirerAnn.getDepartmentname());
+		dataMappings.put("Institution ID", acquirerAnn.getInstitutionid());
+		dataMappings.put("Institution Name", acquirerAnn.getInstitutionname());
+		dataMappings.put("Institution Location ID", acquirerAnn.getInstitutionlocationid());
+		dataMappings.put("Institution Location Name", acquirerAnn.getInstitutionlocationname());
+		dataMappings.put("Ordering Clinician", acquirerAnn.getOrderingclinicianname());
+		dataMappings.put("Ordering Clinician UPIN", acquirerAnn.getOrderingclinicianUPIN());
+		dataMappings.put("Consulting Clinician", acquirerAnn.getReviewingclinician());
+		
+		// Retrieve the Signal Characteristics block.  The Sampling rate and number of channels
+		// information will not be gathered here, since those are being tracked elsewhere.
+		
+		Signalcharacteristics signalProperties = dataAnnotations.getSignalcharacteristics();
+		
+		dataMappings.put("Signal Resolution", signalProperties.getSignalresolution());
+		dataMappings.put("AC Setting", signalProperties.getAcsetting());
+		dataMappings.put("Acquisition Type", signalProperties.getAcquisitiontype());
+		dataMappings.put("Bits Per Sample", signalProperties.getBitspersample());
+		dataMappings.put("Signal Offset", signalProperties.getSignaloffset());
+		dataMappings.put("Signal Signed", signalProperties.getSignalsigned());
+		dataMappings.put("Lead Set", signalProperties.getLeadset());
+		
+		return dataMappings;
+	}
 
 		LinkedHashMap<String, String> extractGlobalElements(Globalmeasurements globalAnnotations) {
 			LinkedHashMap<String, String> annotationMappings = new LinkedHashMap<String, String>();
