@@ -89,6 +89,20 @@ public class UploadManager {
 	EnumFileType fileType;
 	Document xmlJdom;
 	
+	long overallStartTime;
+	long fileLoadStartTime;
+	long ftpStartTime;
+	long conversionStartTime;
+	long annotationStartTime;
+	long overallEndTime;
+	long intermediateEndTime;
+	
+	long fileLoadTimeElapsed;
+	long ftpTimeElapsed;
+	long conversionTimeElapsed;
+	long annotationTimeElapsed;
+	long overallTimeElapsed;
+	
 	// For Philips 1.03 format
 	org.sierraecg.schema.Restingecgdata philipsECG103;
 	org.sierraecg.DecodedLead[] leadData103;
@@ -99,6 +113,8 @@ public class UploadManager {
  
 	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath) throws UploadFailureException {
 
+		overallStartTime = java.lang.System.currentTimeMillis();
+		
 		metaData.setFileName(fileName);
 		metaData.setStudyID(studyID);
 		metaData.setDatatype(datatype);
@@ -112,6 +128,7 @@ public class UploadManager {
 		user = ResourceUtility.getCurrentUser();
 
 		try {
+			fileLoadStartTime = java.lang.System.currentTimeMillis();
 		
 				fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
 				
@@ -187,6 +204,10 @@ public class UploadManager {
 				}
 				metaData.setUserID(userId);
 				
+				intermediateEndTime = java.lang.System.currentTimeMillis();
+				
+				fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
+				
 				String outputDirectory = uploadFileFtp(userId, tempFile);
 	
 				convertUploadedFile(outputDirectory, userId, false);
@@ -195,6 +216,16 @@ public class UploadManager {
 				e.printStackTrace();
 				throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
 			}	
+		
+		overallEndTime = java.lang.System.currentTimeMillis();
+		
+		overallTimeElapsed = overallEndTime - overallStartTime;
+		
+		System.out.println("The overall runtime = " + overallTimeElapsed + " milliseconds");
+		System.out.println("The runtime for preparing the file for upload = " + fileLoadTimeElapsed + " milliseconds");
+		System.out.println("The runtime for uploading the file = " + ftpTimeElapsed + " milliseconds");
+		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
+		System.out.println("The runtime for adding annotations (Philips only) = " + annotationTimeElapsed + " milliseconds");
 
 	}
 
@@ -243,6 +274,8 @@ public class UploadManager {
 
 	private String uploadFileFtp(String userId, File file) throws UploadFailureException {
 
+		ftpStartTime = java.lang.System.currentTimeMillis();
+		
 		String outputDir = "";
 		String targetSubjectId = "";
 
@@ -275,12 +308,18 @@ public class UploadManager {
 		else {
 			file.delete();
 		}
+		
+		intermediateEndTime = java.lang.System.currentTimeMillis();
+		
+		ftpTimeElapsed = intermediateEndTime - ftpStartTime;
 
 		return outputDir;
 	}
 
 	private void convertUploadedFile(String outputDirectory, String uId, boolean isPublic) throws UploadFailureException {
 
+		conversionStartTime = java.lang.System.currentTimeMillis();
+		
 			String method = "na";
 			String outfilename = ""; 
 			if(File.separator.equals("\\")) {
@@ -366,6 +405,12 @@ public class UploadManager {
 			
 			utility.storeFileMetaData(metaData);
 			
+			intermediateEndTime = java.lang.System.currentTimeMillis();
+			
+			conversionTimeElapsed = intermediateEndTime - conversionStartTime;
+			
+			annotationStartTime = java.lang.System.currentTimeMillis();
+			
 			// Now do annotations from Muse or Philips files
 			if(fileType == EnumFileType.PHIL103) {
 				ProcessPhilips103 phil103Ann = new ProcessPhilips103(philipsECG103, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
@@ -395,6 +440,10 @@ public class UploadManager {
 				convertNonLeadAnnotations(orderList, "");
 				convertNonLeadAnnotations(dataList, "");
 			}
+			
+			intermediateEndTime = java.lang.System.currentTimeMillis();
+			
+			annotationTimeElapsed = intermediateEndTime - annotationStartTime;
 			
 	}
 

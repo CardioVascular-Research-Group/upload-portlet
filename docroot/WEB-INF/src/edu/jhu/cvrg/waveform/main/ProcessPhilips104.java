@@ -99,7 +99,6 @@ public class ProcessPhilips104 {
 			
 			for(String key : orderMappings.keySet()) {
 				if((orderMappings.get(key) != null)) {
-					//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
 					AnnotationData annData = new AnnotationData();
 					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
 					annData.setIsSinglePoint(true);
@@ -134,7 +133,6 @@ public class ProcessPhilips104 {
 		
 		for(String key : dataMappings.keySet()) {
 			if((dataMappings.get(key) != null)) {
-				//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
 				AnnotationData annData = new AnnotationData();
 				annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
 				annData.setIsSinglePoint(true);
@@ -166,7 +164,6 @@ public class ProcessPhilips104 {
 			
 			for(String key : annotationMappings.keySet()) {
 				if((annotationMappings.get(key) != null)) {
-					//System.out.println("Annotation Name = " + key + " and value = " + annotationMappings.get(key).toString());
 					AnnotationData annData = new AnnotationData();
 					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
 					annData.setIsSinglePoint(true);
@@ -203,8 +200,6 @@ public class ProcessPhilips104 {
 				int index = 0;
 				
 				for(String key : groupMappings.keySet()) {
-					//System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
-					System.out.println("Annotation Name = " + key + " and value = " + groupMappings.get(key).toString());
 					AnnotationData annData = new AnnotationData();
 					annData.setIsComment(true); // TODO:  Rename this to isNonLeadAnnotation instead
 					annData.setIsSinglePoint(true);
@@ -242,7 +237,6 @@ public class ProcessPhilips104 {
 			int leadIndex = 0;
 			
 			for(Leadmeasurement annotation: leadAnnotationGroup) {
-				//System.out.println("Lead name BEFORE insertion into list = " + annotation.getLeadname());
 				LinkedHashMap<String, Object> leadMappings = annotationRetriever.extractLeadMeasurements(annotation);
 				AnnotationData[] annotationsToAdd = new AnnotationData[leadMappings.size()];
 				int arrayIndex = 0;
