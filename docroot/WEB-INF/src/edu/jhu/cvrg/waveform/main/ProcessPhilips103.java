@@ -30,6 +30,11 @@ public class ProcessPhilips103 {
 	private String recordName;
 	private String subjectID;
 	private final String createdBy = "Philips Upload";
+	private long orderinfoRuntime;
+	private long dataacquisitionRuntime;
+	private long crossleadAnnotationsRuntime;
+	private long groupAnnotationsRuntime;
+	private long leadmeasurementsRuntime;
 	
 	public ProcessPhilips103(Restingecgdata newECG, String newStudyID, String newUserID, String newRecordName, String newSubjectID) {
 		restingECG = newECG;
@@ -83,12 +88,19 @@ public class ProcessPhilips103 {
 		// in the schema for this version of Philips 
 		if(restingECG.getMeasurements() != null) {
 			this.processGlobalAnnotations();
-			this.processGroupAnnotations();
+			this.processGroupAnnotations();		// This is not being used temporarily until we decide how to fit this into the schema.  Do NOT remove this method for any reason
 			this.processLeadAnnotations();
 		}
+		
+		System.out.println("The total runtime for parsing order information is " + orderinfoRuntime);
+		System.out.println("The total runtime for parsing data acquisitions is " + dataacquisitionRuntime);
+		System.out.println("The total runtime for parsing cross lead measurements is " + crossleadAnnotationsRuntime);
+		System.out.println("The total runtime for parsing group measurements is " + groupAnnotationsRuntime);
+		System.out.println("The total runtime for parsing lead measurements is " + leadmeasurementsRuntime);
 	}
 	
 	private void extractOrderInformation() {
+		long orderinfoStarttime = java.lang.System.currentTimeMillis();
 		Orderinfo orderinfoAnn = restingECG.getOrderinfo();
 		if(orderinfoAnn != null) {
 			LinkedHashMap<String, Object> orderMappings = annotationRetriever.extractOrderInfo(orderinfoAnn);
@@ -117,9 +129,15 @@ public class ProcessPhilips103 {
 				}
 			}
 		}
+		long orderinfoEndtime = java.lang.System.currentTimeMillis();
+		
+		orderinfoRuntime = orderinfoEndtime - orderinfoStarttime;
 	}
 	
 	private void processDataAcquisition() {
+		long dataacquisitionStarttime = java.lang.System.currentTimeMillis();
+
+		
 		Dataacquisition dataAcquisAnn = restingECG.getDataacquisition();
 
 		//  This one is does not have a check for null since Data Acquisition is a required tag in the Schema
@@ -150,9 +168,15 @@ public class ProcessPhilips103 {
 				dataAcquisitionList.add(annData);
 			}
 		}
+		
+		long dataacquisitionEndtime = java.lang.System.currentTimeMillis();
+		
+		dataacquisitionRuntime = dataacquisitionEndtime - dataacquisitionStarttime;
 	}
 	
 	private void processGlobalAnnotations() {
+		long crossleadStarttime = java.lang.System.currentTimeMillis();
+		
 		Globalmeasurements globalAnnotations = restingECG.getMeasurements().getGlobalmeasurements();
 		
 		LinkedHashMap<String, String> annotationMappings = annotationRetriever.extractGlobalElements(globalAnnotations);
@@ -181,9 +205,15 @@ public class ProcessPhilips103 {
 			}
 		}
 		
+		long crossleadEndtime = java.lang.System.currentTimeMillis();
+		
+		crossleadAnnotationsRuntime = crossleadEndtime - crossleadStarttime;
+		
 	}
 	
 	private void processGroupAnnotations() {
+		long groupStarttime = java.lang.System.currentTimeMillis();
+		
 		Groupmeasurements groupAnnotations = restingECG.getMeasurements().getGroupmeasurements();
 		
 		List<Groupmeasurement> groupAnnotation = groupAnnotations.getGroupmeasurement();
@@ -218,10 +248,16 @@ public class ProcessPhilips103 {
 			}
 			
 			groupAnnotationsList.add(annotationsToAdd);
+			
+			long groupEndtime = java.lang.System.currentTimeMillis();
+			
+			groupAnnotationsRuntime = groupEndtime - groupStarttime;
 		}
 	}
 	
 	private void processLeadAnnotations() {
+		long leadStarttime = java.lang.System.currentTimeMillis();
+		
 		Leadmeasurements allLeadAnnotations = restingECG.getMeasurements().getLeadmeasurements();
 		
 		List<Leadmeasurement> leadAnnotationGroup = allLeadAnnotations.getLeadmeasurement();
@@ -261,5 +297,9 @@ public class ProcessPhilips103 {
 			leadAnnotationsList.add(annotationsToAdd);
 			leadIndex++;
 		}
+		
+		long leadEndtime = java.lang.System.currentTimeMillis();
+		
+		leadmeasurementsRuntime = leadEndtime - leadStarttime;
 	}
 }
