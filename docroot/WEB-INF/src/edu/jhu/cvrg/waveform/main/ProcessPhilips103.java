@@ -12,7 +12,7 @@ import edu.jhu.cvrg.waveform.model.AnnotationData;
 
 /**
  * This class will take the annotation data that has been gathered and put it into a form which complies
- * with our XML schema
+ * with our XML schema.
  * 
  * @author bbenite1
  *
