@@ -30,20 +30,21 @@
                             <p:commandButton style=" font-family: helvetica;font-size:8pt;" id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
                         </p:panelGrid>              
 
-                        <p:tree id="fileTree" style="float:left;border:0;"
-							cache="true"
-							dynamic="true"
-							selection="#{fileUploadBacking.fileTree.selectedNode}" 
-							selectionMode="single"
-							value="#{fileUploadBacking.fileTree.treeRoot}" 
-							var="node">
-							
-								<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" />
-							                            
-        						<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed" >  
-            						<h:outputText value="#{node}"/>  
-        						</p:treeNode> 
-    					</p:tree>  
+   							<p:tree id="fileTree" 
+								dynamic="true"
+								selection="#{fileUploadBacking.fileTree.selectedNodes}"
+								selectionMode="multiple"
+								value="#{fileUploadBacking.fileTree.treeRoot}" 
+								var="node">
+
+								<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
+									<h:outputText value="#{node.subjectID}" />
+								</p:treeNode>
+								
+								<p:treeNode type="document" icon="ui-icon ui-icon-document">
+									<h:outputText value="#{node.subjectID}"/>
+								</p:treeNode>
+							</p:tree>
 					</p:panel> 
       
 					<p:panel id="fileUploadPanel" header="Select files form your computer to upload and save" styleClass="upload-panel">    

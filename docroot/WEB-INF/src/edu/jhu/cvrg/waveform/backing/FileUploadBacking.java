@@ -30,6 +30,8 @@ import javax.faces.context.FacesContext;
 
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
+import org.primefaces.event.NodeUnselectEvent;
+import org.primefaces.model.TreeNode;
 
 import com.liferay.portal.model.User;
 
@@ -46,7 +48,7 @@ public class FileUploadBacking implements Serializable{
 	private static final long serialVersionUID = 1L;
 	private FileTree fileTree;
 	private String text;  
-	private User user;
+	private User userModel;
 	
     public void handleFileUpload(FileUploadEvent event) {
 
@@ -54,13 +56,11 @@ public class FileUploadBacking implements Serializable{
     	//TODO: Implement a means for the user to input the studyID and the datatype.
 	}
     
-	@PostConstruct
+//	@PostConstruct
 	public void init() {
-
-		user = ResourceUtility.getCurrentUser();
-		if (fileTree == null) {
-			fileTree = new FileTree();
-			fileTree.initialize(user.getScreenName());
+		userModel = ResourceUtility.getCurrentUser();
+		if(fileTree == null){
+			fileTree = new FileTree(userModel.getScreenName());
 		}
 	}
     
@@ -94,7 +94,7 @@ public class FileUploadBacking implements Serializable{
 			msg = new FacesMessage("Failure", "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
 		}
 		
-		fileTree.initialize(user.getScreenName());
+		fileTree.initialize(userModel.getScreenName());
 		
 		FacesContext.getCurrentInstance().addMessage(null, msg);
     }
