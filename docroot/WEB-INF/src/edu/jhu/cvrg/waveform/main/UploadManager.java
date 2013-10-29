@@ -33,38 +33,25 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
-import java.util.Iterator;
 
 import javax.xml.bind.JAXBException;
 
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
-import org.jdom.Namespace;
-import org.jdom.filter.ElementFilter;
 import org.jdom.input.SAXBuilder;
-import org.jdom.output.XMLOutputter;
-
-// This is for Philips 1.03 format
-import org.sierraecg.DecodedLead;
 import org.sierraecg.SierraEcgFiles;
-import org.sierraecg.schema.Generalpatientdata;
-import org.sierraecg.schema.Restingecgdata;
 import org.sierraecg.schema.Signalcharacteristics;
-
-// This is for Philips 1.04 format
-import org.cvrgrid.philips.*;
-import org.cvrgrid.philips.jaxb.schema.*;
 
 import com.liferay.portal.model.User;
 
@@ -78,6 +65,8 @@ import edu.jhu.cvrg.waveform.utility.MetaContainer;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.UploadUtility;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
+// This is for Philips 1.03 format
+// This is for Philips 1.04 format
 
 public class UploadManager {
 

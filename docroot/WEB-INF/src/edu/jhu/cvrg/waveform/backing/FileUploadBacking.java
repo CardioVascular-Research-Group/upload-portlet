@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 
-import javax.annotation.PostConstruct;
 import javax.faces.application.FacesMessage;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
@@ -30,8 +29,6 @@ import javax.faces.context.FacesContext;
 
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
-import org.primefaces.event.NodeUnselectEvent;
-import org.primefaces.model.TreeNode;
 
 import com.liferay.portal.model.User;
 
@@ -56,7 +53,6 @@ public class FileUploadBacking implements Serializable{
     	//TODO: Implement a means for the user to input the studyID and the datatype.
 	}
     
-//	@PostConstruct
 	public void init() {
 		userModel = ResourceUtility.getCurrentUser();
 		if(fileTree == null){
@@ -66,7 +62,10 @@ public class FileUploadBacking implements Serializable{
     
     private void fileUpload(FileUploadEvent event, String studyID, String datatype) {
     	
-    	System.out.println("Handling upload... Path is " + fileTree.getSelectedNodePath());
+    	String uploadPath = fileTree.getSelectedNodePath();
+    	if(uploadPath.equals("")){
+    		return;
+    	}
 
     	UploadManager uploadManager = new UploadManager();
     	
@@ -81,7 +80,7 @@ public class FileUploadBacking implements Serializable{
 
 			// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
 			// the function will use UTF-8 by default
-			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectedNodePath());
+			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, uploadPath);
 			msg = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -100,7 +99,7 @@ public class FileUploadBacking implements Serializable{
     }
     
     public void onNodeSelect(NodeSelectEvent event) { 
-    	System.out.println("Node selected... Path is " + fileTree.getSelectedNodePath());
+
     }
     
     public String getText() {return text;}  

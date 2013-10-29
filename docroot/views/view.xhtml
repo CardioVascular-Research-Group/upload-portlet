@@ -10,8 +10,6 @@
 	<h:head />
 	<h:body>
 
-
-	
 	<h:panelGroup layout="block" id="uploadTopContentLineShade" styleClass="topLineShade"> 
    		<h:outputText styleClass="TitleLine" value="ICM Electrocardiograph Tool Kit: Upload" />
    	</h:panelGroup>
@@ -31,11 +29,13 @@
                         </p:panelGrid>              
 
    							<p:tree id="fileTree" 
-								dynamic="true"
-								selection="#{fileUploadBacking.fileTree.selectedNodes}"
-								selectionMode="multiple"
+								selection="#{fileUploadBacking.fileTree.selectedNode}"
+								selectionMode="single"
 								value="#{fileUploadBacking.fileTree.treeRoot}" 
 								var="node">
+								
+								<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" update="fileTree"/>
+								
 
 								<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
 									<h:outputText value="#{node.subjectID}" />
