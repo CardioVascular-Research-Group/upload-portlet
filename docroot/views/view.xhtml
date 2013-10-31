@@ -18,38 +18,39 @@
 	
 	<f:event type="preRenderView" listener="#{fileUploadBacking.init}" />
 	
-	<h:panelGroup layout="block" styleClass="backgroundofContent">
- 		<p:layout style=" height:550px; top:20px;" id="layoutUpload">
-			<p:layoutUnit position="center" styleClass="layout-main">
-				<h:form id="formUpload" enctype="multipart/form-data" style="height:555">
-    				
-    				<p:panel id="panel" header="Select Folder to Upload Files Into" styleClass="tree-panel">
-                              
-                        <p:panelGrid id="buttonGrid" columns="3" style="border:0;" >
-                            <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
-                            <p:commandButton style=" font-family: helvetica;font-size:8pt;" id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
-                        </p:panelGrid>              
+	<h:form id="formUpload" enctype="multipart/form-data">
+	<p:layout id="layoutUpload" style="width:100%;height:500px" >
+  
+ 		<p:layoutUnit position="west" header="Select Folder to Upload Files Into" resizable="true" size="350" minSize="350" maxSize="600" >
+ 			    
+	        	<p:panelGrid id="buttonGrid" columns="3" style="border:0;" >
+                    <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
+                    <p:commandButton  id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
+                </p:panelGrid>              
 
-   							<p:tree id="fileTree" 
-								dynamic="true"
-								selection="#{fileUploadBacking.fileTree.selectedNodes}"
-								selectionMode="multiple"
-								value="#{fileUploadBacking.fileTree.treeRoot}" 
-								var="node">
-
-								<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
-									<h:outputText value="#{node.subjectID}" />
-								</p:treeNode>
-								
-								<p:treeNode type="document" icon="ui-icon ui-icon-document">
-									<h:outputText value="#{node.subjectID}"/>
-								</p:treeNode>
-							</p:tree>
-					</p:panel> 
-      
-					<p:panel id="fileUploadPanel" header="Select files form your computer to upload and save" styleClass="upload-panel">    
-                    
-                   		<p:fileUpload id="uploader" style="float:right; width:100%!important;"
+				<p:tree id="fileTree" 
+					dynamic="true"
+					selection="#{fileUploadBacking.fileTree.selectedNode}"
+					selectionMode="single"
+					value="#{fileUploadBacking.fileTree.treeRoot}" 
+					var="node">
+					
+					<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" update="fileTree"/>
+					
+					<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
+						<h:outputText value="#{node}" />
+					</p:treeNode>
+					
+					<p:treeNode type="document" icon="ui-icon ui-icon-document">
+						<h:outputText value="#{node}"/>
+					</p:treeNode>
+				</p:tree>
+			
+    	</p:layoutUnit>
+    	
+    	<p:layoutUnit position="center" header="Select files form your computer to upload and save" >
+    		  
+	        	<p:fileUpload id="uploader"
                         	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
         	                value="Facts" 
         	                multiple="true"
@@ -59,13 +60,12 @@
                 	        widgetVar="waveformFileUpload"
                     	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
                         	description="Select Images" 
-                        	update="fileTree"/>          
-                 	</p:panel>  
-       			</h:form>
-          </p:layoutUnit>
-		</p:layout>
-</h:panelGroup>
-
-
+                        	update="fileTree"/>
+            
+    	</p:layoutUnit>
+    	  
+	</p:layout>
+	</h:form>
+	
 	</h:body>
 </f:view>

@@ -28,12 +28,12 @@ background-color: #3DB6E3;
 }
 
 .tree-panel {
-	position:relative;
-	left:5px; 
 	width:400px; 
-	left:5px;  
-	height:500px; 
-	z-index:100;
+/* 	position:relative; */
+/* 	left:5px;  */
+/* 	left:5px;   */
+/* 	height:500px;  */
+/* 	z-index:100; */
 }
 
 .upload-panel {
@@ -129,4 +129,8 @@ size:8pt;
 border:0!important;
 border-size:0!important;
 font-family: helvetica!important;
+}
+
+.ui-tree{
+	border:0!important;	
 }

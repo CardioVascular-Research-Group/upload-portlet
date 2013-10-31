@@ -5,10 +5,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Random;
 
-import org.cvrgrid.philips.jaxb.beans.*;
-import org.cvrgrid.philips.jaxb.schema.*;
+import org.cvrgrid.philips.jaxb.beans.Crossleadmeasurements;
+import org.cvrgrid.philips.jaxb.beans.Dataacquisition;
+import org.cvrgrid.philips.jaxb.beans.Groupmeasurement;
+import org.cvrgrid.philips.jaxb.beans.Groupmeasurements;
+import org.cvrgrid.philips.jaxb.beans.Leadmeasurement;
+import org.cvrgrid.philips.jaxb.beans.Leadmeasurements;
+import org.cvrgrid.philips.jaxb.beans.Orderinfo;
+import org.cvrgrid.philips.jaxb.beans.Restingecgdata;
+
 import edu.jhu.cvrg.waveform.model.AnnotationData;
-import edu.jhu.cvrg.waveform.utility.AnnotationUtility;
 
 /**
  * This class will take the annotation data that has been gathered and put it into a form which complies

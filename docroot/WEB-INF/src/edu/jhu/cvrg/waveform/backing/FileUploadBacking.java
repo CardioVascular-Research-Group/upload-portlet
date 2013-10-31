@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 
-import javax.annotation.PostConstruct;
 import javax.faces.application.FacesMessage;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
@@ -30,8 +29,6 @@ import javax.faces.context.FacesContext;
 
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
-import org.primefaces.event.NodeUnselectEvent;
-import org.primefaces.model.TreeNode;
 
 import com.liferay.portal.model.User;
 
@@ -45,28 +42,27 @@ import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 
 public class FileUploadBacking implements Serializable{
 	
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = -4715402539808469047L;
+	
 	private FileTree fileTree;
 	private String text;  
 	private User userModel;
 	
-    public void handleFileUpload(FileUploadEvent event) {
-
-    	fileUpload(event, "Mesa",  "Rhythm Strips");
-    	//TODO: Implement a means for the user to input the studyID and the datatype.
-	}
-    
-//	@PostConstruct
 	public void init() {
 		userModel = ResourceUtility.getCurrentUser();
-		if(fileTree == null){
-			fileTree = new FileTree(userModel.getScreenName());
+		if(fileTree == null && userModel != null){
+			fileTree = new FileTree(userModel.getUserId());
 		}
 	}
+	
+    public void handleFileUpload(FileUploadEvent event) {
+    	//TODO: Implement a means for the user to input the studyID and the datatype.
+    	fileUpload(event, "Mesa",  "Rhythm Strips");
+    }
     
     private void fileUpload(FileUploadEvent event, String studyID, String datatype) {
     	
-    	System.out.println("Handling upload... Path is " + fileTree.getSelectedNodePath());
+    	System.out.println("Handling upload... Folder name is " + fileTree.getSelectFolder().getName());
 
     	UploadManager uploadManager = new UploadManager();
     	
@@ -81,7 +77,7 @@ public class FileUploadBacking implements Serializable{
 
 			// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
 			// the function will use UTF-8 by default
-			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectedNodePath());
+			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectFolder());
 			msg = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -94,13 +90,13 @@ public class FileUploadBacking implements Serializable{
 			msg = new FacesMessage("Failure", "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
 		}
 		
-		fileTree.initialize(userModel.getScreenName());
+		fileTree.initialize(userModel.getUserId());
 		
 		FacesContext.getCurrentInstance().addMessage(null, msg);
     }
     
     public void onNodeSelect(NodeSelectEvent event) { 
-    	System.out.println("Node selected... Path is " + fileTree.getSelectedNodePath());
+    	System.out.println("Node selected... ID is " + fileTree.getSelectedNodeId());
     }
     
     public String getText() {return text;}  

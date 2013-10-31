@@ -1,9 +1,17 @@
 package edu.jhu.cvrg.waveform.main;
 
-import org.cvrgrid.philips.jaxb.beans.*;
-import org.cvrgrid.philips.jaxb.beans.Orderinfo.Other;
-import org.cvrgrid.philips.jaxb.schema.*;
 import java.util.LinkedHashMap;
+
+import org.cvrgrid.philips.jaxb.beans.Acquirer;
+import org.cvrgrid.philips.jaxb.beans.Crossleadmeasurements;
+import org.cvrgrid.philips.jaxb.beans.Dataacquisition;
+import org.cvrgrid.philips.jaxb.beans.Drgcategory;
+import org.cvrgrid.philips.jaxb.beans.Groupmeasurement;
+import org.cvrgrid.philips.jaxb.beans.Leadmeasurement;
+import org.cvrgrid.philips.jaxb.beans.Orderinfo;
+import org.cvrgrid.philips.jaxb.beans.Orderinfo.Other;
+import org.cvrgrid.philips.jaxb.beans.Signalcharacteristics;
+import org.cvrgrid.philips.jaxb.beans.TYPEmessagecode;
 
 // This class contains methods for retrieving annotations from the XML file.
 // The class is left at the default (package level) visibility as they are not intended to

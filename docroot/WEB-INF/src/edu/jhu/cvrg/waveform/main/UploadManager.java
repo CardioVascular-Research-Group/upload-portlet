@@ -24,49 +24,41 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.Reader;
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
-import java.util.Iterator;
 
 import javax.xml.bind.JAXBException;
 
+import org.apache.axiom.om.OMElement;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
-import org.jdom.Namespace;
-import org.jdom.filter.ElementFilter;
 import org.jdom.input.SAXBuilder;
-import org.jdom.output.XMLOutputter;
-
-// This is for Philips 1.03 format
-import org.sierraecg.DecodedLead;
+import org.sierraecg.PreprocessReturn;
 import org.sierraecg.SierraEcgFiles;
-import org.sierraecg.schema.Generalpatientdata;
-import org.sierraecg.schema.Restingecgdata;
 import org.sierraecg.schema.Signalcharacteristics;
 
-// This is for Philips 1.04 format
-import org.cvrgrid.philips.*;
-import org.cvrgrid.philips.jaxb.schema.*;
-
+import com.liferay.faces.portal.context.LiferayFacesContext;
+import com.liferay.portal.kernel.exception.PortalException;
+import com.liferay.portal.kernel.exception.SystemException;
+import com.liferay.portal.kernel.repository.model.FileEntry;
+import com.liferay.portal.kernel.repository.model.Folder;
 import com.liferay.portal.model.User;
+import com.liferay.portal.service.ServiceContext;
+import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.model.AnnotationData;
@@ -78,16 +70,16 @@ import edu.jhu.cvrg.waveform.utility.MetaContainer;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.UploadUtility;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
+// This is for Philips 1.03 format
+// This is for Philips 1.04 format
 
 public class UploadManager {
 
 	private char name_separator = (char) 95;
 
 	private MetaContainer metaData = new MetaContainer();
-	private String tempHeaderFile = "";
 	private User user;
 	EnumFileType fileType;
-	Document xmlJdom;
 	
 	long overallStartTime;
 	long fileLoadStartTime;
@@ -103,119 +95,130 @@ public class UploadManager {
 	long annotationTimeElapsed;
 	long overallTimeElapsed;
 	
-	// For Philips 1.03 format
-	org.sierraecg.schema.Restingecgdata philipsECG103;
-	org.sierraecg.DecodedLead[] leadData103;
+	private FileEntry wfdbPairFile;
 	
-	// For Philips 1.04 format
-	org.cvrgrid.philips.jaxb.beans.Restingecgdata philipsECG104;
-	org.cvrgrid.philips.DecodedLead[] leadData104;
- 
-	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath) throws UploadFailureException {
+	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, Folder folder) throws UploadFailureException {
 
 		overallStartTime = java.lang.System.currentTimeMillis();
 		
 		metaData.setFileName(fileName);
 		metaData.setStudyID(studyID);
 		metaData.setDatatype(datatype);
-		if(virtualPath != null) {
-			metaData.setTreePath(virtualPath);
+		
+		if(folder != null) {
+			StringBuilder treePath = new StringBuilder();
+			extractFolderHierachic(folder, treePath);
+			metaData.setTreePath(treePath.toString());
 		}
 		else {
 			throw new UploadFailureException("Please select a folder");
 		}
 
 		user = ResourceUtility.getCurrentUser();
-
-		try {
-			fileLoadStartTime = java.lang.System.currentTimeMillis();
 		
-				fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
+		try {
+			boolean performConvesion = true;
+			
+			fileLoadStartTime = java.lang.System.currentTimeMillis();
+			fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
+			
+			FileEntry liferayFile = storeFile(fileToSave, fileSize, folder);
+			
+			switch (fileType) {
+			case XML:
+
+				StringBuilder xmlString = new StringBuilder();
 				
-				File tempFile =	saveFileToTemp(fileToSave, fileSize);
+				BufferedReader xmlBuf = new BufferedReader(new InputStreamReader(liferayFile.getContentStream()));
+				String line = xmlBuf.readLine();
 				
-				if(fileType == EnumFileType.XML) {
-					String xmlString = "";
-					
-					BufferedReader xmlBuf = new BufferedReader(new FileReader(tempFile));
-					String line = xmlBuf.readLine();
-					
-					while(line != null) {			
-						if(!(line.contains("!DOCTYPE"))) {
-							xmlString = xmlString + line;
-						}
-						line = xmlBuf.readLine();
+				while(line != null) {			
+					if(!(line.contains("!DOCTYPE"))) {
+						xmlString.append(line);
 					}
+					line = xmlBuf.readLine();
+				}
+				
+				xmlBuf.close();
+				
+				// check for the first xml tag
+				// if it does not exist, remake the file using UTF-16 
+				// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
+				if(xmlString.indexOf("xml") == -1) {
+					// TODO:  In the future, use a library to check for the encoding that the stream uses
 					
-					xmlBuf.close();
+					xmlString = new StringBuilder(convertStreamToString(liferayFile.getContentStream(), "UTF-16"));
 					
-					// check for the first xml tag
-					// if it does not exist, remake the file using UTF-16 
-					// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
-					if(!(xmlString.contains("xml"))) {
-						// TODO:  In the future, use a library to check for the encoding that the stream uses
-						FileInputStream tempFis = new FileInputStream(tempFile);
-						xmlString = convertStreamToString(tempFis, "UTF-16");
-						tempFis.close();
-						tempFile.delete();
+					deleteFile(liferayFile);
+					
+					fileToSave = new ByteArrayInputStream(xmlString.toString().getBytes("UTF-16"));
+					
+					liferayFile = storeFile(fileToSave, fileSize, folder);
+					
+				}
+				
+				
+				// indicates one of the Philips formats
+				
+				// JDOM seems to be having problems building the XML structure for Philips 1.03,
+				// Checking for the elements directly in the string is required to get the right version
+				// and also takes less memory
+				
+				
+				//TODO [VILARDO] MOVE THE EXTRACT METHODS TO UPLOAD WEB SERVICE
+				if(xmlString.indexOf("restingecgdata") != -1) {						
+					if(xmlString.indexOf("<documentversion>1.03</documentversion>") != -1) {
+						fileType = EnumFileType.PHIL103;
+//						ecgData = extractPhilips103Data(liferayFile);
+					}
+					else if(xmlString.indexOf("<documentversion>1.04</documentversion>") != -1) {
+						fileType = EnumFileType.PHIL104;
+//						ecgData = extractPhilips104Data(liferayFile);
+					}
+					else {
+						throw new UploadFailureException("Unrecognized version number for Philips file");
+					}
 						
-						fileToSave = new ByteArrayInputStream(xmlString.getBytes("UTF-16"));
-						tempFile = saveFileToTemp(fileToSave, fileSize);
-						
-					}
-					
-					
-					// indicates one of the Philips formats
-					
-					// JDOM seems to be having problems building the XML structure for Philips 1.03,
-					// Checking for the elements directly in the string is required to get the right version
-					// and also takes less memory
-					if(xmlString.contains("restingecgdata")) {						
-						if(xmlString.contains("<documentversion>1.03</documentversion>")) {
-							fileType = EnumFileType.PHIL103;
-							extractPhilips103Data(tempFile);
-						}
-						else if(xmlString.contains("<documentversion>1.04</documentversion>")) {
-							fileType = EnumFileType.PHIL104;
-							extractPhilips104Data(tempFile);
-						}
-						else {
-							throw new UploadFailureException("Unrecognized version number for Philips file");
-						}
-							
-							//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
-							// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
-							
-					}
-					// indicates GE Muse 7
-					else if(xmlString.contains("RestingECG")) {
 						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
 						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
-						xmlJdom = build(xmlString);
-						fileType = EnumFileType.MUSEXML;
-						extractMuseXMLData();
-					}						
-					
+				
+				// indicates GE Muse 7
+				}else if(xmlString.indexOf("RestingECG") != -1) {
+					//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
+					// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
+					fileType = EnumFileType.MUSEXML;
+//					extractMuseXMLData(build(xmlString));
 				}
-				
-				String userId = user.getScreenName();
-				if(userId == null || userId.equals("")){
-					userId = user.getEmailAddress();
-				}
-				metaData.setUserID(userId);
-				
-				intermediateEndTime = java.lang.System.currentTimeMillis();
-				
-				fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
-				
-				String outputDirectory = uploadFileFtp(userId, tempFile);
-	
-				convertUploadedFile(outputDirectory, userId, false);
+				break;
+			case HEA:
+			case DAT:	
+				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
+				break;
+			}
 
-			} catch (Exception e) {
-				e.printStackTrace();
-				throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
-			}	
+			
+			String userId = user.getScreenName();
+			if(userId == null || userId.equals("")){
+				userId = user.getEmailAddress();
+			}
+			metaData.setUserID(userId);
+			
+			intermediateEndTime = java.lang.System.currentTimeMillis();
+			
+			fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
+			
+			//String outputDirectory = uploadFileFtp(userId, liferayFile);
+			metaData.setRecordName(metaData.getSubjectID());
+			metaData.setFullFilePath("");
+			
+			if(performConvesion){
+				convertUploadedFile(userId, liferayFile);
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
+		}	
 		
 		overallEndTime = java.lang.System.currentTimeMillis();
 		
@@ -229,7 +232,57 @@ public class UploadManager {
 
 	}
 
-	private File saveFileToTemp(InputStream fileToSave, long fileSize) {
+	private boolean checkWFDBFiles(FileEntry liferayFile, EnumFileType fileType2) throws PortalException, SystemException {
+		
+		boolean ret = false;
+		
+		Long folderId = liferayFile.getFolderId();
+		List<FileEntry> subFiles = DLAppLocalServiceUtil.getFileEntries(ResourceUtility.getCurrentGroupId(), folderId);
+		if(subFiles != null){
+			for (FileEntry file : subFiles) {
+				if(EnumFileType.HEA.equals(fileType)){	
+					ret = file.getTitle().substring(0, file.getTitle().indexOf('.')).equals(liferayFile.getTitle().substring(0, file.getTitle().indexOf('.'))) && 
+					   	  EnumFileType.DAT.toString().equalsIgnoreCase(file.getExtension());
+				}else if(EnumFileType.DAT.equals(fileType)){
+					ret = file.getTitle().substring(0, file.getTitle().indexOf('.')).equals(liferayFile.getTitle().substring(0, file.getTitle().indexOf('.'))) && 
+					   	  EnumFileType.HEA.toString().equalsIgnoreCase(file.getExtension());
+				}
+				
+				if(ret){
+					wfdbPairFile = file;
+					break;
+				}
+			}				
+		}
+		return ret;
+	}
+
+	private void extractFolderHierachic(Folder folder, StringBuilder treePath) {
+		try {
+			if(folder != null && !"waveform".equals(folder.getName())){
+				if(folder.getParentFolder() != null){
+					extractFolderHierachic(folder.getParentFolder(), treePath);
+				}
+				treePath.append('/').append(folder.getName());
+			}
+		} catch (Exception e) {
+			System.err.println("Problems with the folder structure");
+		}
+	}
+
+	private void deleteFile(FileEntry liferayFile) {
+		
+		try {
+			DLAppLocalServiceUtil.deleteFileEntry(liferayFile.getFileEntryId());
+		} catch (PortalException e) {
+			e.printStackTrace();
+		} catch (SystemException e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	private FileEntry storeFile(InputStream fileToSave, long fileSize, Folder folder) {
 
 		if (fileSize < Integer.MIN_VALUE || fileSize > Integer.MAX_VALUE) {
 			throw new IllegalArgumentException(fileSize	+ " cannot be cast to int without changing its value.");
@@ -239,20 +292,16 @@ public class UploadManager {
 		metaData.setFileSize(fileSizeInt);
 
 		try {
-			File targetFile = new File(ResourceUtility.getStagingFolder() + metaData.getFileName());
-			OutputStream fOutStream = new FileOutputStream(targetFile);
-
-			int read = 0;
-			byte[] bytes = new byte[1024];
-
-			while ((read = fileToSave.read(bytes)) != -1) {
-				fOutStream.write(bytes, 0, read);
-			}
-
+			
+			byte[] bytes = new byte[fileSizeInt];
+			fileToSave.read(bytes);
+			
+			//TODO [VILARDO] DEFINE THE FILE TYPE
+			ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
+			FileEntry file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
+			
 			fileToSave.close();
-			fOutStream.flush();
-			fOutStream.close();
-
+			
 			int location = metaData.getFileName().indexOf(".");
 
 			if (location != -1) {
@@ -261,7 +310,7 @@ public class UploadManager {
 				metaData.setSubjectID(metaData.getFileName());
 			}
 			
-			return targetFile;
+			return file;
 
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -272,62 +321,11 @@ public class UploadManager {
 		return null;
 	}
 
-	private String uploadFileFtp(String userId, File file) throws UploadFailureException {
-
-		ftpStartTime = java.lang.System.currentTimeMillis();
-		
-		String outputDir = "";
-		String targetSubjectId = "";
-
-		if (extension(metaData.getFileName()).equalsIgnoreCase("zip")) {
-			outputDir = userId + generateTime();
-		} else {
-			outputDir = userId + name_separator + metaData.getSubjectID();
-		}
-		
-		if (metaData.getSubjectID().equals("")) {
-			targetSubjectId = "null";
-		} else {
-			targetSubjectId = metaData.getSubjectID();
-			targetSubjectId = targetSubjectId.replace("_", "");
-		}
-
-		metaData.setRecordName(metaData.getSubjectID());
-
-		FTPUtility.uploadToRemote(outputDir, file);
-		
-		metaData.setFullFilePath("/" + outputDir + "/");
-		
-		EnumFileType fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
-		
-		if(fileType == EnumFileType.HEA) {
-			// do not delete a header file just yet, we need it for parsing metadata (the app looks for the local
-			// version of the file, NOT the remote one).  Without this the parsing will fail
-			tempHeaderFile = file.getPath();
-		}
-		else {
-			file.delete();
-		}
-		
-		intermediateEndTime = java.lang.System.currentTimeMillis();
-		
-		ftpTimeElapsed = intermediateEndTime - ftpStartTime;
-
-		return outputDir;
-	}
-
-	private void convertUploadedFile(String outputDirectory, String uId, boolean isPublic) throws UploadFailureException {
+	private void convertUploadedFile(String uId, FileEntry liferayFile) throws UploadFailureException {
 
 		conversionStartTime = java.lang.System.currentTimeMillis();
 		
 			String method = "na";
-			String outfilename = ""; 
-			if(File.separator.equals("\\")) {
-				outfilename = outputDirectory + "//" + metaData.getFileName();
-			}
-			else {
-				outfilename = outputDirectory + File.separator + File.separator + metaData.getFileName();
-			}
 			boolean correctFormat = true;
 
 			switch (fileType) {
@@ -336,7 +334,7 @@ public class UploadManager {
 			case DAT:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
 			case HEA:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_HEADER);		break;
 			case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ 				break;
-			case TXT:	method = evaluateTextFile(outfilename);	/* will eventually process GE MUSE Text files*/	break;
+			case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
 			case CSV:	method = "xyFile";						break;
 			case NAT:	method = "na";							break;
 			case GTM:	method = "na";							break;
@@ -347,14 +345,14 @@ public class UploadManager {
 			default:	method = "geMuse";						break;
 			}
 			
-			if(fileType == EnumFileType.HEA) {
+			if(EnumFileType.HEA.equals(fileType) || EnumFileType.DAT.equals(fileType)) {
 				
+				FileEntry headerFile = liferayFile;
+				if(EnumFileType.DAT.equals(fileType)){
+					headerFile = wfdbPairFile;
+				}
 				// Parse the locally held header file
-				correctFormat = checkWFDBHeader(tempHeaderFile);
-				
-				// now we can delete the file
-				File file = new File(tempHeaderFile);
-				file.delete();
+				correctFormat = checkWFDBHeader(headerFile);
 			}
 			
 			if(!correctFormat) {
@@ -362,14 +360,6 @@ public class UploadManager {
 			}
 			
 			System.out.println("method = " + method);
-			
-			if(ResourceUtility.getFtpHost().equals("0") ||
-					ResourceUtility.getFtpUser().equals("0") ||
-					ResourceUtility.getFtpPassword().equals("0")){
-				
-				System.out.println("Missing FTP Configuration.  Cannot run File Conversion Web Service.");
-				return;		
-			}
 			
 			if(ResourceUtility.getNodeConversionService().equals("0")){
 				System.out.println("Missing Web Service Configuration.  Cannot run File Conversion Web Service.");
@@ -382,68 +372,41 @@ public class UploadManager {
 			
 				parameterMap.put("userid", uId);
 				parameterMap.put("subjectid", metaData.getSubjectID());
-				parameterMap.put("filename", outfilename);
+				parameterMap.put("filename", liferayFile.getTitle());
 
-				parameterMap.put("ftphost", ResourceUtility.getFtpHost());
-				parameterMap.put("ftpuser", ResourceUtility.getFtpUser());
-				parameterMap.put("ftppassword", ResourceUtility.getFtpPassword());
-
-				parameterMap.put("publicprivatefolder", String.valueOf(isPublic));
 				parameterMap.put("verbose", String.valueOf(false));
 				parameterMap.put("service", "DataConversion");
+				
+				parameterMap.put("groupId", String.valueOf(liferayFile.getGroupId()));
+				parameterMap.put("folderId", String.valueOf(liferayFile.getFolderId()));
+				
+				
+				LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
+				
+				switch (fileType) {
+				case HEA:
+					filesMap.put("contentFile", wfdbPairFile);
+					filesMap.put("headerFile", liferayFile);
+					break;
+				case DAT:
+					filesMap.put("contentFile", liferayFile);
+					filesMap.put("headerFile", wfdbPairFile);
+					break;
+				default:
+					filesMap.put("contentFile", liferayFile);
+					break;
+				}
+				
 
 				System.out.println("Calling Web Service.");
 				
-				WebServiceUtility.callWebService(parameterMap, isPublic, method, ResourceUtility.getNodeConversionService(), null);
+				OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
+				
+				
 			}
 			
-			UploadUtility utility = new UploadUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
-					com.liferay.util.portlet.PortletProps.get("dbPassword"), 
-					com.liferay.util.portlet.PortletProps.get("dbURI"),	
-					com.liferay.util.portlet.PortletProps.get("dbDriver"), 
-					com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
-			
-			utility.storeFileMetaData(metaData);
-			
 			intermediateEndTime = java.lang.System.currentTimeMillis();
-			
 			conversionTimeElapsed = intermediateEndTime - conversionStartTime;
-			
-			annotationStartTime = java.lang.System.currentTimeMillis();
-			
-			// Now do annotations from Muse or Philips files
-			if(fileType == EnumFileType.PHIL103) {
-				ProcessPhilips103 phil103Ann = new ProcessPhilips103(philipsECG103, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
-				phil103Ann.populateAnnotations();
-				
-				ArrayList<AnnotationData> orderList = phil103Ann.getOrderInfo();
-				ArrayList<AnnotationData> dataList = phil103Ann.getDataAcquisitions();
-				ArrayList<AnnotationData> globalList = phil103Ann.getGlobalAnnotations();
-				ArrayList<AnnotationData[]> leadList = phil103Ann.getLeadAnnotations();
-				
-				convertNonLeadAnnotations(globalList, "");
-				convertLeadAnnotations(leadList);
-				convertNonLeadAnnotations(orderList, "");
-				convertNonLeadAnnotations(dataList, "");
-			}
-			else if(fileType == EnumFileType.PHIL104) {
-				ProcessPhilips104 phil104Ann = new ProcessPhilips104(philipsECG104, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
-				phil104Ann.populateAnnotations();
-				
-				ArrayList<AnnotationData> orderList = phil104Ann.getOrderInfo();
-				ArrayList<AnnotationData> dataList = phil104Ann.getDataAcquisitions();
-				ArrayList<AnnotationData> globalList = phil104Ann.getCrossleadAnnotations();
-				ArrayList<AnnotationData[]> leadList = phil104Ann.getLeadAnnotations();
-				
-				convertNonLeadAnnotations(globalList, "");
-				convertLeadAnnotations(leadList);
-				convertNonLeadAnnotations(orderList, "");
-				convertNonLeadAnnotations(dataList, "");
-			}
-			
-			intermediateEndTime = java.lang.System.currentTimeMillis();
-			
-			annotationTimeElapsed = intermediateEndTime - annotationStartTime;
 			
 	}
 
@@ -459,7 +422,7 @@ public class UploadManager {
 		return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
 	}
 	
-	private boolean checkWFDBHeader(String fileLocation) {
+	private boolean checkWFDBHeader(FileEntry file) {
 		
 		// To find out more about the WFDB header format, go to:
 		// http://www.physionet.org/physiotools/wag/header-5.htm
@@ -467,16 +430,11 @@ public class UploadManager {
 		// The goal is to extract the metadata information needed without the need for using the physionet libraries
 		
 		boolean returnValue = false;
-
-		FileInputStream file = null;
 		DataInputStream wfdbInputStream = null;
-		
 		BufferedReader br = null;
 		
 		try{
-
-			file = new FileInputStream(fileLocation);
-			wfdbInputStream = new DataInputStream(file);
+			wfdbInputStream = new DataInputStream(file.getContentStream());
 		    br = new BufferedReader(new InputStreamReader(wfdbInputStream));
 		    String strLine;
 		    String[] words;
@@ -550,9 +508,6 @@ public class UploadManager {
 			if(br != null) {
 				br.close();
 			}
-			if(file != null) {
-				file.close();
-			}
 
 		}catch (Exception e){ //Catch exception if any
 			System.err.println("Error: " + e.getMessage());
@@ -562,9 +517,6 @@ public class UploadManager {
 				}
 				if(br != null) {
 					br.close();
-				}
-				if(file != null) {
-					file.close();
 				}
 			} catch (IOException e2) {
 				System.err.println("Error: " + e2.getMessage());
@@ -637,29 +589,38 @@ public class UploadManager {
 	// Unfortunately, the two different data structures for Philips are not interchangeable.  Since the underlying 
 	// schema is different, different beans are used to house the structure.  So while similar on the surface, under
 	// the hood they are organized differently.
-	private void extractPhilips103Data(File file) throws IOException, JAXBException {
-		philipsECG103 = SierraEcgFiles.preprocess(file);
-		leadData103 = SierraEcgFiles.extractLeads(file);
+	private org.sierraecg.schema.Restingecgdata extractPhilips103Data(File file) throws IOException, JAXBException {
+		PreprocessReturn ret = SierraEcgFiles.preprocess(file);
+		
+		org.sierraecg.schema.Restingecgdata	philipsECG103 = ret.getRestingEcgData();
+		org.sierraecg.DecodedLead[] leadData103 = ret.getDecodedLeads();
+		
 		Signalcharacteristics signalMetaData = philipsECG103.getDataacquisition().getSignalcharacteristics();
 		
 		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
 		metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
 		metaData.setNumberOfPoints(leadData103[0].size() * metaData.getChannels());
 		
+		return philipsECG103;
+		
 	}
 	
-	private void extractPhilips104Data(File file) throws IOException, JAXBException {
-		philipsECG104 = org.cvrgrid.philips.SierraEcgFiles.preprocess(file);
-		leadData104 = org.cvrgrid.philips.SierraEcgFiles.extractLeads(file);
+	private org.cvrgrid.philips.jaxb.beans.Restingecgdata extractPhilips104Data(File file) throws IOException, JAXBException {
+		org.cvrgrid.philips.PreprocessReturn ret = org.cvrgrid.philips.SierraEcgFiles.preprocess(file);
+		
+		org.cvrgrid.philips.jaxb.beans.Restingecgdata philipsECG104 = ret.getRestingEcgData();
+		org.cvrgrid.philips.DecodedLead[] leadData104 = ret.getDecodedLeads();
+		
 		org.cvrgrid.philips.jaxb.beans.Signalcharacteristics signalMetaData = philipsECG104.getDataacquisition().getSignalcharacteristics();
 		
 		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
 		metaData.setChannels(signalMetaData.getNumberchannelsallocated().intValue());  // Method returns a BigInteger, so a conversion to int is required.
 		metaData.setNumberOfPoints(leadData104[0].size() * metaData.getChannels());
 
+		return philipsECG104;
 	}
 	
-	private void extractMuseXMLData() {
+	private void extractMuseXMLData(Document xmlJdom) {
 		Element rootElement = xmlJdom.getRootElement();
 		List waveformElements = rootElement.getChildren("Waveform");
 		

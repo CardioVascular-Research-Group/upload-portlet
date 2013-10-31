@@ -5,8 +5,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Random;
 
-import org.sierraecg.*;
-import org.sierraecg.schema.*;
+import org.sierraecg.schema.Dataacquisition;
+import org.sierraecg.schema.Globalmeasurements;
+import org.sierraecg.schema.Groupmeasurement;
+import org.sierraecg.schema.Groupmeasurements;
+import org.sierraecg.schema.Leadmeasurement;
+import org.sierraecg.schema.Leadmeasurements;
+import org.sierraecg.schema.Orderinfo;
+import org.sierraecg.schema.Restingecgdata;
 
 import edu.jhu.cvrg.waveform.model.AnnotationData;
 
