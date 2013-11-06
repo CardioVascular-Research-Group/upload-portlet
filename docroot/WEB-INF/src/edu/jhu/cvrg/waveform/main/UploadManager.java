@@ -23,33 +23,19 @@ limitations under the License.
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Random;
 import java.util.Scanner;
-
-import javax.xml.bind.JAXBException;
 
 import org.apache.axiom.om.OMElement;
 import org.jdom.Document;
-import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
-import org.sierraecg.PreprocessReturn;
-import org.sierraecg.SierraEcgFiles;
-import org.sierraecg.schema.Signalcharacteristics;
 
 import com.liferay.faces.portal.context.LiferayFacesContext;
 import com.liferay.portal.kernel.exception.PortalException;
@@ -61,31 +47,24 @@ import com.liferay.portal.service.ServiceContext;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
-import edu.jhu.cvrg.waveform.model.AnnotationData;
 import edu.jhu.cvrg.waveform.model.StudyEntry;
-import edu.jhu.cvrg.waveform.utility.AnnotationUtility;
 import edu.jhu.cvrg.waveform.utility.EnumFileType;
-import edu.jhu.cvrg.waveform.utility.FTPUtility;
 import edu.jhu.cvrg.waveform.utility.MetaContainer;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
-import edu.jhu.cvrg.waveform.utility.UploadUtility;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 // This is for Philips 1.03 format
 // This is for Philips 1.04 format
 
 public class UploadManager {
 
-	private char name_separator = (char) 95;
-
 	private MetaContainer metaData = new MetaContainer();
+	
 	private User user;
 	EnumFileType fileType;
 	
 	long overallStartTime;
 	long fileLoadStartTime;
-	long ftpStartTime;
 	long conversionStartTime;
-	long annotationStartTime;
 	long overallEndTime;
 	long intermediateEndTime;
 	
@@ -164,30 +143,20 @@ public class UploadManager {
 				// Checking for the elements directly in the string is required to get the right version
 				// and also takes less memory
 				
-				
-				//TODO [VILARDO] MOVE THE EXTRACT METHODS TO UPLOAD WEB SERVICE
 				if(xmlString.indexOf("restingecgdata") != -1) {						
 					if(xmlString.indexOf("<documentversion>1.03</documentversion>") != -1) {
 						fileType = EnumFileType.PHIL103;
-//						ecgData = extractPhilips103Data(liferayFile);
 					}
 					else if(xmlString.indexOf("<documentversion>1.04</documentversion>") != -1) {
 						fileType = EnumFileType.PHIL104;
-//						ecgData = extractPhilips104Data(liferayFile);
 					}
 					else {
 						throw new UploadFailureException("Unrecognized version number for Philips file");
 					}
-						
-						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
-						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
 				
 				// indicates GE Muse 7
 				}else if(xmlString.indexOf("RestingECG") != -1) {
-					//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
-					// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
 					fileType = EnumFileType.MUSEXML;
-//					extractMuseXMLData(build(xmlString));
 				}
 				break;
 			case HEA:
@@ -207,9 +176,7 @@ public class UploadManager {
 			
 			fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
 			
-			//String outputDirectory = uploadFileFtp(userId, liferayFile);
 			metaData.setRecordName(metaData.getSubjectID());
-			metaData.setFullFilePath("");
 			
 			if(performConvesion){
 				convertUploadedFile(userId, liferayFile);
@@ -225,11 +192,8 @@ public class UploadManager {
 		overallTimeElapsed = overallEndTime - overallStartTime;
 		
 		System.out.println("The overall runtime = " + overallTimeElapsed + " milliseconds");
-		System.out.println("The runtime for preparing the file for upload = " + fileLoadTimeElapsed + " milliseconds");
-		System.out.println("The runtime for uploading the file = " + ftpTimeElapsed + " milliseconds");
+		System.out.println("The runtime for uploading the file = " + fileLoadTimeElapsed + " milliseconds");
 		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
-		System.out.println("The runtime for adding annotations (Philips only) = " + annotationTimeElapsed + " milliseconds");
-
 	}
 
 	private boolean checkWFDBFiles(FileEntry liferayFile, EnumFileType fileType2) throws PortalException, SystemException {
@@ -371,14 +335,20 @@ public class UploadManager {
 				LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
 			
 				parameterMap.put("userid", uId);
-				parameterMap.put("subjectid", metaData.getSubjectID());
-				parameterMap.put("filename", liferayFile.getTitle());
-
-				parameterMap.put("verbose", String.valueOf(false));
-				parameterMap.put("service", "DataConversion");
+				parameterMap.put("subjectid", 	metaData.getSubjectID());
+				parameterMap.put("filename", 	liferayFile.getTitle());
+				parameterMap.put("studyID", 	metaData.getStudyID());
+				parameterMap.put("datatype", 	metaData.getDatatype());
+				parameterMap.put("treePath", 	metaData.getTreePath());
+				parameterMap.put("recordName", 	metaData.getRecordName());
+				parameterMap.put("fileSize", 	String.valueOf(metaData.getFileSize()));
+				parameterMap.put("fileFormat", 	String.valueOf(metaData.getFileFormat()));
 				
-				parameterMap.put("groupId", String.valueOf(liferayFile.getGroupId()));
-				parameterMap.put("folderId", String.valueOf(liferayFile.getFolderId()));
+				parameterMap.put("verbose", 	String.valueOf(false));
+				parameterMap.put("service", 	"DataConversion");
+				
+				parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
+				parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
 				
 				
 				LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
@@ -422,6 +392,8 @@ public class UploadManager {
 		return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
 	}
 	
+	
+	//TODO [VILARDO] TENTAR MOVER PARA WEBSERVICE
 	private boolean checkWFDBHeader(FileEntry file) {
 		
 		// To find out more about the WFDB header format, go to:
@@ -527,199 +499,6 @@ public class UploadManager {
 		return returnValue;
 	}
 
-	private String generateTime() {
-
-		// create a unique folder name based on current date/time plus a random
-		// number.
-		// Easier for humans read than a GUID and sorts in a meaningful way.
-		
-		Date newDate = new Date();
-		String dateString = newDate.toString();	
-		SimpleDateFormat newDateFormat = new SimpleDateFormat("MMddHHmmss");
-		try {
-			Date parsedDate = newDateFormat.parse(dateString);
-			System.out.println("File date string: " + parsedDate.toString());
-		} catch (ParseException e) {
-			System.out.println("Date thingy failed.");
-			e.printStackTrace();
-		}
-				
-		Calendar now = Calendar.getInstance();
-		
-		int year = now.get(Calendar.YEAR);
-		int month = now.get(Calendar.MONTH) + 1;
-		int day = now.get(Calendar.DATE);
-		int hour = now.get(Calendar.HOUR_OF_DAY); // 24 hour format
-		int minute = now.get(Calendar.MINUTE);
-		int second = now.get(Calendar.SECOND);
-		String date = new Integer(year).toString();
-
-		if (month < 10)
-			date = date + "0"; // zero padding single digit months to aid
-								// sorting.
-		date = date + new Integer(month).toString();
-
-		if (day < 10)
-			date = date + "0"; // zero padding to aid sorting.
-		date = date + new Integer(day).toString();
-
-		String time = "";
-
-		if (hour < 10)
-			time = time + "0"; // zero padding to aid sorting.
-		time = time + new Integer(hour).toString();
-
-		if (minute < 10)
-			time = time + "0"; // zero padding to aid sorting.
-		time = time + new Integer(minute).toString();
-
-		if (second < 10)
-			time = time + "0"; // zero padding to aid sorting.
-		time = time + new Integer(second).toString() + "|";
-
-		// add the random number just to be sure we avoid name collisions
-		Random rand = new Random();
-		time = time + rand.nextInt(1000);
-
-		metaData.setDate(month + "/" + day + "/" + year);
-
-		return date + time;
-	}
-	
-	// Unfortunately, the two different data structures for Philips are not interchangeable.  Since the underlying 
-	// schema is different, different beans are used to house the structure.  So while similar on the surface, under
-	// the hood they are organized differently.
-	private org.sierraecg.schema.Restingecgdata extractPhilips103Data(File file) throws IOException, JAXBException {
-		PreprocessReturn ret = SierraEcgFiles.preprocess(file);
-		
-		org.sierraecg.schema.Restingecgdata	philipsECG103 = ret.getRestingEcgData();
-		org.sierraecg.DecodedLead[] leadData103 = ret.getDecodedLeads();
-		
-		Signalcharacteristics signalMetaData = philipsECG103.getDataacquisition().getSignalcharacteristics();
-		
-		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
-		metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
-		metaData.setNumberOfPoints(leadData103[0].size() * metaData.getChannels());
-		
-		return philipsECG103;
-		
-	}
-	
-	private org.cvrgrid.philips.jaxb.beans.Restingecgdata extractPhilips104Data(File file) throws IOException, JAXBException {
-		org.cvrgrid.philips.PreprocessReturn ret = org.cvrgrid.philips.SierraEcgFiles.preprocess(file);
-		
-		org.cvrgrid.philips.jaxb.beans.Restingecgdata philipsECG104 = ret.getRestingEcgData();
-		org.cvrgrid.philips.DecodedLead[] leadData104 = ret.getDecodedLeads();
-		
-		org.cvrgrid.philips.jaxb.beans.Signalcharacteristics signalMetaData = philipsECG104.getDataacquisition().getSignalcharacteristics();
-		
-		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
-		metaData.setChannels(signalMetaData.getNumberchannelsallocated().intValue());  // Method returns a BigInteger, so a conversion to int is required.
-		metaData.setNumberOfPoints(leadData104[0].size() * metaData.getChannels());
-
-		return philipsECG104;
-	}
-	
-	private void extractMuseXMLData(Document xmlJdom) {
-		Element rootElement = xmlJdom.getRootElement();
-		List waveformElements = rootElement.getChildren("Waveform");
-		
-		// Since the DTD was unable to be found, the XML had to be traversed one level at a time
-		if(!(waveformElements.isEmpty())) {
-			Iterator waveformIter = waveformElements.iterator();
-			while(waveformIter.hasNext()) {
-				Element nextWaveform = (Element)waveformIter.next();
-				Element waveformType = nextWaveform.getChild("WaveformType");
-				
-				// Check to make sure there are valid waveforms, then get each WaveFormData tag, which is a child of a LeadData tag
-				if((waveformType != null) && (waveformType.getText().equals("Rhythm"))) {
-					
-					// get the Sampling Rate of the waveform in the process
-					metaData.setSampFrequency(Float.valueOf(nextWaveform.getChild("SampleBase").getText()));
-					
-					List leadDataList = nextWaveform.getChildren("LeadData");
-					
-					if(!(leadDataList.isEmpty())) {
-						metaData.setChannels(leadDataList.size());
-						
-						Iterator leadIter = leadDataList.iterator();
-						
-						Element leadData = (Element)leadIter.next();
-						Element sampleCount = leadData.getChild("LeadSampleCountTotal");
-							
-						metaData.setNumberOfPoints(Integer.valueOf(sampleCount.getText()) * metaData.getChannels());
-					}
-				}
-			}
-		}
-	}
-	
-	public static void convertAnnotations(AnnotationData[] annotationArray, boolean isLeadAnnotation, String groupName) throws UploadFailureException {
-		//AnnotationUtility dbAnnUtility = new AnnotationUtility("waveformUser", "d@rks0uls!", "xmldb:exist://128.220.76.161:8080/exist-1.4.2-rev16251/xmlrpc", "org.exist.xmldb.DatabaseImpl", "/db/waveformrecords");
-		AnnotationUtility dbAnnUtility = new AnnotationUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
-				com.liferay.util.portlet.PortletProps.get("dbPassword"), 
-				com.liferay.util.portlet.PortletProps.get("dbURI"),	
-				com.liferay.util.portlet.PortletProps.get("dbDriver"), 
-				com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
-		
-		for(AnnotationData annData : annotationArray) {			
-			boolean success = true;
-			
-			if(isLeadAnnotation) {
-				System.out.println("Storing lead index " + annData.getLeadIndex());
-				success = dbAnnUtility.storeLeadAnnotationNode(annData);
-				
-			}
-			else {
-				success = dbAnnUtility.storeComment(annData);
-			}
-			
-			if(!success) {
-				throw new UploadFailureException("Annotations for Philips file failed to enter the database properly");
-			}
-		}
-	}
-	
-	private void convertLeadAnnotations(ArrayList<AnnotationData[]> allLeadAnnotations) throws UploadFailureException {
-		for(int i=0; i<allLeadAnnotations.size(); i++) {
-			if(allLeadAnnotations.get(i).length != 0) {
-				System.out.println("There are annotations in this lead.  The size is " + allLeadAnnotations.get(i).length);
-				convertAnnotations(allLeadAnnotations.get(i), true, "");
-			}
-		}
-	}
-	
-	private void convertNonLeadAnnotations(ArrayList<AnnotationData> allAnnotations, String groupName) throws UploadFailureException {
-		AnnotationData[] annotationArray = new AnnotationData[allAnnotations.size()];
-		annotationArray = allAnnotations.toArray(annotationArray);
-		
-		
-		convertAnnotations(annotationArray, false, groupName);
-	}
-	
-	
-	/**
-	 * Helper method to build a <code>jdom.org.Document</code> from an 
-	 * XML document represented as a String
-	 * @param  xmlDocAsString  <code>String</code> representation of an XML
-	 *         document with a document declaration.
-	 *         e.g., <?xml version="1.0" encoding="UTF-8"?>
-	 *                  <root><stuff>Some stuff</stuff></root>
-	 * @return Document from an XML document represented as a String
-	 */
-	private static Document build(String xmlDocAsString) 
-	        throws JDOMException {
-		Document doc = null;
-	    SAXBuilder builder = new SAXBuilder();
-	    Reader stringreader = new StringReader(xmlDocAsString);
-	    try {
-	    	doc = builder.build(stringreader);
-	    } catch(IOException ioex) {
-	    	ioex.printStackTrace();
-	    }
-	    return doc;
-	}
-	
 	private static String convertStreamToString(InputStream is, String encoding) {
 	    Scanner inputScan = new Scanner(is, encoding).useDelimiter("\\A");
 	    if(inputScan.hasNext()) {

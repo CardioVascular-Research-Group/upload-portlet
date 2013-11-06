@@ -134,3 +134,9 @@ font-family: helvetica!important;
 .ui-tree{
 	border:0!important;	
 }
+
+.noTableBorder, .noTableBorder tr, .noTableBorder td {
+    border-color: inherit;
+    border-style: none!important;
+    border-width: 0px!important;
+}
