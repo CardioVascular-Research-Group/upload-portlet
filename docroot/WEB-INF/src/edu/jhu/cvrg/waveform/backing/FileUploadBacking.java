@@ -34,7 +34,7 @@ import com.liferay.portal.model.User;
 
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.main.UploadManager;
-import edu.jhu.cvrg.waveform.model.FileTree;
+import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 
 @ManagedBean(name="fileUploadBacking")
@@ -44,14 +44,14 @@ public class FileUploadBacking implements Serializable{
 	
 	private static final long serialVersionUID = -4715402539808469047L;
 	
-	private FileTree fileTree;
+	private LocalFileTree fileTree;
 	private String text;  
 	private User userModel;
 	
 	public void init() {
 		userModel = ResourceUtility.getCurrentUser();
 		if(fileTree == null && userModel != null){
-			fileTree = new FileTree(userModel.getUserId());
+			fileTree = new LocalFileTree(userModel.getUserId());
 		}
 	}
 	
@@ -102,11 +102,11 @@ public class FileUploadBacking implements Serializable{
     public String getText() {return text;}  
     public void setText(String text) {this.text = text;}
 
-	public FileTree getFileTree() {
+	public LocalFileTree getFileTree() {
 		return fileTree;
 	}
 
-	public void setFileTree(FileTree fileTree) {
+	public void setFileTree(LocalFileTree fileTree) {
 		this.fileTree = fileTree;
 	}
 }
