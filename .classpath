@@ -4,9 +4,5 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jst.server.core.container/com.liferay.ide.eclipse.server.tomcat.runtimeClasspathProvider/Liferay v6.1 CE (Tomcat 7)"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.web.container"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/dbutility"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/waveform-annotations"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/waveform-utilities"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/ECG_Converter4"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

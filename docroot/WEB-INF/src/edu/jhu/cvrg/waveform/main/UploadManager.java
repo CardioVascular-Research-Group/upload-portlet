@@ -76,24 +76,44 @@ public class UploadManager {
 	
 	private FileEntry wfdbPairFile;
 	
-	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, Folder folder) throws UploadFailureException {
+	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, Folder destFolder) throws UploadFailureException {
 
 		overallStartTime = java.lang.System.currentTimeMillis();
 		
 		metaData.setFileName(fileName);
 		metaData.setStudyID(studyID);
 		metaData.setDatatype(datatype);
+		int location = metaData.getFileName().indexOf(".");
+
+		if (location != -1) {
+			metaData.setSubjectID(metaData.getFileName().substring(0, location));
+		} else {
+			metaData.setSubjectID(metaData.getFileName());
+		}
 		
-		if(folder != null) {
+		metaData.setRecordName(metaData.getSubjectID());
+		
+		user = ResourceUtility.getCurrentUser();
+		
+		String userId = user.getScreenName();
+		if(userId == null || userId.equals("")){
+			userId = user.getEmailAddress();
+		}
+		metaData.setUserID(userId);
+		
+		
+		Folder recordNameFolder = createRecordNameFolder(destFolder);
+		
+		if(recordNameFolder != null) {
 			StringBuilder treePath = new StringBuilder();
-			extractFolderHierachic(folder, treePath);
+			extractFolderHierachic(recordNameFolder, treePath);
 			metaData.setTreePath(treePath.toString());
 		}
 		else {
 			throw new UploadFailureException("Please select a folder");
 		}
 
-		user = ResourceUtility.getCurrentUser();
+		
 		
 		try {
 			boolean performConvesion = true;
@@ -101,7 +121,7 @@ public class UploadManager {
 			fileLoadStartTime = java.lang.System.currentTimeMillis();
 			fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
 			
-			FileEntry liferayFile = storeFile(fileToSave, fileSize, folder);
+			FileEntry liferayFile = storeFile(fileToSave, fileSize, recordNameFolder);
 			
 			switch (fileType) {
 			case XML:
@@ -132,7 +152,7 @@ public class UploadManager {
 					
 					fileToSave = new ByteArrayInputStream(xmlString.toString().getBytes("UTF-16"));
 					
-					liferayFile = storeFile(fileToSave, fileSize, folder);
+					liferayFile = storeFile(fileToSave, fileSize, recordNameFolder);
 					
 				}
 				
@@ -166,17 +186,10 @@ public class UploadManager {
 			}
 
 			
-			String userId = user.getScreenName();
-			if(userId == null || userId.equals("")){
-				userId = user.getEmailAddress();
-			}
-			metaData.setUserID(userId);
 			
 			intermediateEndTime = java.lang.System.currentTimeMillis();
 			
 			fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
-			
-			metaData.setRecordName(metaData.getSubjectID());
 			
 			if(performConvesion){
 				convertUploadedFile(userId, liferayFile);
@@ -194,6 +207,31 @@ public class UploadManager {
 		System.out.println("The overall runtime = " + overallTimeElapsed + " milliseconds");
 		System.out.println("The runtime for uploading the file = " + fileLoadTimeElapsed + " milliseconds");
 		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
+	}
+
+	private Folder createRecordNameFolder(Folder folder) {
+		
+		Folder recordNameFolder = null;
+		try {
+			long folderId = 0L;
+			if(folder != null){
+				folderId = folder.getFolderId();
+			}
+			Folder parentFolder = DLAppLocalServiceUtil.getFolder(folderId);
+			
+			if(!parentFolder.getName().equals(metaData.getRecordName())){
+			
+				ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
+				recordNameFolder = DLAppLocalServiceUtil.addFolder(user.getUserId(), ResourceUtility.getCurrentGroupId(), folderId, metaData.getRecordName(), "", service);
+			}else{
+				recordNameFolder = parentFolder;
+			}
+		} catch (PortalException e) {
+			e.printStackTrace();
+		} catch (SystemException e) {
+			e.printStackTrace();
+		}
+		return recordNameFolder;
 	}
 
 	private boolean checkWFDBFiles(FileEntry liferayFile, EnumFileType fileType2) throws PortalException, SystemException {
@@ -265,14 +303,6 @@ public class UploadManager {
 			FileEntry file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
 			
 			fileToSave.close();
-			
-			int location = metaData.getFileName().indexOf(".");
-
-			if (location != -1) {
-				metaData.setSubjectID(metaData.getFileName().substring(0, location));
-			} else {
-				metaData.setSubjectID(metaData.getFileName());
-			}
 			
 			return file;
 
@@ -393,7 +423,7 @@ public class UploadManager {
 	}
 	
 	
-	//TODO [VILARDO] TENTAR MOVER PARA WEBSERVICE
+	//TODO [VILARDO] TRY TO MOVE TO WEB SERVICE
 	private boolean checkWFDBHeader(FileEntry file) {
 		
 		// To find out more about the WFDB header format, go to:
