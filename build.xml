@@ -9,6 +9,6 @@
 	</copy>
 	
 	<copy todir="docroot/WEB-INF/lib">
-		<fileset dir="/opt/liferay/utility-builds" includes="*.jar"/>
+		<fileset dir="/opt/liferay/utility-jars" includes="*.jar"/>
 	</copy>
 </project>
