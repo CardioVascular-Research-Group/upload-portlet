@@ -26,16 +26,11 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.StringReader;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Scanner;
 
 import org.apache.axiom.om.OMElement;
-import org.jdom.Document;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
 
 import com.liferay.faces.portal.context.LiferayFacesContext;
 import com.liferay.portal.kernel.exception.PortalException;
@@ -46,10 +41,10 @@ import com.liferay.portal.model.User;
 import com.liferay.portal.service.ServiceContext;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
+import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
+import edu.jhu.cvrg.dbapi.factory.exists.model.StudyEntry;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
-import edu.jhu.cvrg.waveform.model.StudyEntry;
 import edu.jhu.cvrg.waveform.utility.EnumFileType;
-import edu.jhu.cvrg.waveform.utility.MetaContainer;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 // This is for Philips 1.03 format
@@ -95,7 +90,7 @@ public class UploadManager {
 		
 		user = ResourceUtility.getCurrentUser();
 		
-		String userId = user.getScreenName();
+		String userId = String.valueOf(user.getUserId());
 		if(userId == null || userId.equals("")){
 			userId = user.getEmailAddress();
 		}
@@ -213,18 +208,28 @@ public class UploadManager {
 		
 		Folder recordNameFolder = null;
 		try {
-			long folderId = 0L;
-			if(folder != null){
-				folderId = folder.getFolderId();
+			long folderId;
+			if(folder == null){
+				folder = DLAppLocalServiceUtil.getFolder(0L);
 			}
-			Folder parentFolder = DLAppLocalServiceUtil.getFolder(folderId);
+			folderId = folder.getFolderId();
 			
-			if(!parentFolder.getName().equals(metaData.getRecordName())){
-			
+			if(!folder.getName().equals(metaData.getRecordName())){
+				
+				List<Folder> subFolders = DLAppLocalServiceUtil.getFolders(folder.getRepositoryId(), folderId);
+				
+				if(subFolders!=null){
+					for (Folder sub : subFolders) {
+						if(sub.getName().equals(metaData.getRecordName())){
+							return sub;
+						}
+					}
+				}
+				
 				ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
 				recordNameFolder = DLAppLocalServiceUtil.addFolder(user.getUserId(), ResourceUtility.getCurrentGroupId(), folderId, metaData.getRecordName(), "", service);
 			}else{
-				recordNameFolder = parentFolder;
+				recordNameFolder = folder;
 			}
 		} catch (PortalException e) {
 			e.printStackTrace();
@@ -377,9 +382,9 @@ public class UploadManager {
 				parameterMap.put("verbose", 	String.valueOf(false));
 				parameterMap.put("service", 	"DataConversion");
 				
+				parameterMap.put("companyId", 	String.valueOf(ResourceUtility.getCurrentCompanyId()));
 				parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
 				parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
-				
 				
 				LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
 				
