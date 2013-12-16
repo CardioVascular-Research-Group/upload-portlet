@@ -7,8 +7,4 @@
 	<copy todir="docroot/WEB-INF/lib">
 		<fileset dir="/opt/liferay/portlet-opt" includes="*.jar"/>
 	</copy>
-	
-	<copy todir="docroot/WEB-INF/lib">
-		<fileset dir="/opt/liferay/utility-jars" includes="*.jar"/>
-	</copy>
 </project>
