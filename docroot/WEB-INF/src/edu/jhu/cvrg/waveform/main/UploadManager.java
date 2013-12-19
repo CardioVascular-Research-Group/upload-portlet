@@ -39,6 +39,7 @@ import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.repository.model.Folder;
 import com.liferay.portal.model.User;
 import com.liferay.portal.service.ServiceContext;
+import com.liferay.portlet.documentlibrary.DuplicateFolderNameException;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
 import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
@@ -204,7 +205,7 @@ public class UploadManager {
 		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
 	}
 
-	private Folder createRecordNameFolder(Folder folder) {
+	private synchronized Folder  createRecordNameFolder(Folder folder) {
 		
 		Folder recordNameFolder = null;
 		try {
@@ -227,7 +228,11 @@ public class UploadManager {
 				}
 				
 				ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
-				recordNameFolder = DLAppLocalServiceUtil.addFolder(user.getUserId(), ResourceUtility.getCurrentGroupId(), folderId, metaData.getRecordName(), "", service);
+				try{
+					recordNameFolder = DLAppLocalServiceUtil.addFolder(user.getUserId(), ResourceUtility.getCurrentGroupId(), folderId, metaData.getRecordName(), "", service);
+				}catch (DuplicateFolderNameException e){
+					recordNameFolder = DLAppLocalServiceUtil.getFolder(folder.getRepositoryId(), folder.getFolderId(), metaData.getRecordName());
+				}
 			}else{
 				recordNameFolder = folder;
 			}
@@ -235,7 +240,7 @@ public class UploadManager {
 			e.printStackTrace();
 		} catch (SystemException e) {
 			e.printStackTrace();
-		}
+		} 
 		return recordNameFolder;
 	}
 
