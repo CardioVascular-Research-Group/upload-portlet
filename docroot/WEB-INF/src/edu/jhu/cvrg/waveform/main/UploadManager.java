@@ -179,6 +179,8 @@ public class UploadManager {
 			case DAT:	
 				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
 				break;
+			default:
+				break;
 			}
 
 			
