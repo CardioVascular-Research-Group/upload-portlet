@@ -16,8 +16,6 @@
    		<h:outputText styleClass="TitleLine" value="ICM Electrocardiograph Tool Kit: Upload" />
    	</h:panelGroup>
 	
-	<f:event type="preRenderView" listener="#{fileUploadBacking.init}" />
-	
 	<h:form id="formUpload" enctype="multipart/form-data">
 	<p:layout id="layoutUpload" style="width:100%;height:500px" >
   
@@ -50,19 +48,18 @@
     	
     	<p:layoutUnit position="center" header="Select files form your computer to upload and save" >
     		  
-	        	<p:fileUpload id="uploader"
-                        	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
-        	                value="Facts" 
-        	                multiple="true"
-      	                  	uploadLabel="Upload All"
-            	            cancelLabel="Remove All" 
-            	            auto="false"
-                	        widgetVar="waveformFileUpload"
-                    	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
-                        	description="Select Images" 
-                        	update="fileTree"/>
-            
-    	</p:layoutUnit>
+	       	<p:fileUpload id="uploader"
+	                      	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
+	      	                value="Facts" 
+	      	                multiple="true"
+	    	                uploadLabel="Upload All"
+	          	            cancelLabel="Remove All" 
+	          	            auto="false"
+	              	        widgetVar="waveformFileUpload"
+	                  	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
+	                      	description="Select Images" 
+	                      	update="fileTree"/>
+	        </p:layoutUnit>
     	  
 	</p:layout>
 	</h:form>

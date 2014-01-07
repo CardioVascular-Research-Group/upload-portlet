@@ -39,7 +39,7 @@ import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.repository.model.Folder;
 import com.liferay.portal.model.User;
 import com.liferay.portal.service.ServiceContext;
-import com.liferay.portlet.documentlibrary.DuplicateFolderNameException;
+import com.liferay.portlet.documentlibrary.DuplicateFileException;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
 import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
@@ -47,6 +47,7 @@ import edu.jhu.cvrg.dbapi.factory.exists.model.StudyEntry;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.utility.EnumFileType;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
+import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 // This is for Philips 1.03 format
 // This is for Philips 1.04 format
@@ -98,7 +99,7 @@ public class UploadManager {
 		metaData.setUserID(userId);
 		
 		
-		Folder recordNameFolder = createRecordNameFolder(destFolder);
+		Folder recordNameFolder = createRecordNameFolder(destFolder, metaData.getRecordName(), user.getUserId());
 		
 		if(recordNameFolder != null) {
 			StringBuilder treePath = new StringBuilder();
@@ -207,23 +208,25 @@ public class UploadManager {
 		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
 	}
 
-	private synchronized Folder  createRecordNameFolder(Folder folder) {
+	private synchronized Folder createRecordNameFolder(Folder folder, String recordName, Long userId) {
 		
 		Folder recordNameFolder = null;
+		Semaphore s = Semaphore.getCreateFolderSemaphore();
 		try {
+			s.take();
 			long folderId;
 			if(folder == null){
 				folder = DLAppLocalServiceUtil.getFolder(0L);
 			}
 			folderId = folder.getFolderId();
 			
-			if(!folder.getName().equals(metaData.getRecordName())){
+			if(!folder.getName().equals(recordName)){
 				
 				List<Folder> subFolders = DLAppLocalServiceUtil.getFolders(folder.getRepositoryId(), folderId);
 				
 				if(subFolders!=null){
 					for (Folder sub : subFolders) {
-						if(sub.getName().equals(metaData.getRecordName())){
+						if(sub.getName().equals(recordName)){
 							return sub;
 						}
 					}
@@ -231,9 +234,20 @@ public class UploadManager {
 				
 				ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
 				try{
-					recordNameFolder = DLAppLocalServiceUtil.addFolder(user.getUserId(), ResourceUtility.getCurrentGroupId(), folderId, metaData.getRecordName(), "", service);
-				}catch (DuplicateFolderNameException e){
-					recordNameFolder = DLAppLocalServiceUtil.getFolder(folder.getRepositoryId(), folder.getFolderId(), metaData.getRecordName());
+					recordNameFolder = DLAppLocalServiceUtil.addFolder(userId, ResourceUtility.getCurrentGroupId(), folderId, recordName, "", service);
+				}catch (Exception e){
+					Thread.sleep(2000);
+					int tries = 5;
+					
+					for (int i = 0; i < tries && recordNameFolder == null; i++) {
+						try{
+							recordNameFolder = DLAppLocalServiceUtil.getFolder(folder.getRepositoryId(), folder.getFolderId(), recordName);
+						}catch (Exception e2){
+							Thread.sleep(2000);
+							System.out.println("Sleep and Try Again. #"+(i));
+						}
+					}
+					
 				}
 			}else{
 				recordNameFolder = folder;
@@ -242,7 +256,15 @@ public class UploadManager {
 			e.printStackTrace();
 		} catch (SystemException e) {
 			e.printStackTrace();
-		} 
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}finally{
+			try {
+				s.release();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 		return recordNameFolder;
 	}
 
@@ -296,7 +318,7 @@ public class UploadManager {
 		
 	}
 
-	private FileEntry storeFile(InputStream fileToSave, long fileSize, Folder folder) {
+	private synchronized FileEntry storeFile(InputStream fileToSave, long fileSize, Folder folder) {
 
 		if (fileSize < Integer.MIN_VALUE || fileSize > Integer.MAX_VALUE) {
 			throw new IllegalArgumentException(fileSize	+ " cannot be cast to int without changing its value.");
@@ -304,7 +326,8 @@ public class UploadManager {
 		
 		int fileSizeInt = (int) fileSize;
 		metaData.setFileSize(fileSizeInt);
-
+		FileEntry file = null;
+		
 		try {
 			
 			byte[] bytes = new byte[fileSizeInt];
@@ -312,19 +335,25 @@ public class UploadManager {
 			
 			//TODO [VILARDO] DEFINE THE FILE TYPE
 			ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
-			FileEntry file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
+			file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
 			
 			fileToSave.close();
 			
-			return file;
-
+		} catch(DuplicateFileException e){
+			try {
+				file = DLAppLocalServiceUtil.getFileEntry(ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName());
+			} catch (PortalException e1) {
+				e1.printStackTrace();
+			} catch (SystemException e1) {
+				e1.printStackTrace();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
-		return null;
+		return file;
 	}
 
 	private void convertUploadedFile(String uId, FileEntry liferayFile) throws UploadFailureException {

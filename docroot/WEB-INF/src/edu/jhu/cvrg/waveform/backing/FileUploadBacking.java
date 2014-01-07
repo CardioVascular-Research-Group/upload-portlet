@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 
+import javax.annotation.PostConstruct;
 import javax.faces.application.FacesMessage;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
@@ -48,6 +49,7 @@ public class FileUploadBacking implements Serializable{
 	private String text;  
 	private User userModel;
 	
+	@PostConstruct
 	public void init() {
 		userModel = ResourceUtility.getCurrentUser();
 		if(fileTree == null && userModel != null){
