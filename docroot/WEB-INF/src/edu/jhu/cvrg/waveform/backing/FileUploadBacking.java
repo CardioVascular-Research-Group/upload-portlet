@@ -21,13 +21,18 @@ limitations under the License.
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.annotation.PostConstruct;
 import javax.faces.application.FacesMessage;
+import javax.faces.application.FacesMessage.Severity;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
 import javax.faces.context.FacesContext;
 
+import org.apache.log4j.Logger;
+import org.primefaces.context.RequestContext;
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
 
@@ -48,6 +53,13 @@ public class FileUploadBacking implements Serializable{
 	private LocalFileTree fileTree;
 	private String text;  
 	private User userModel;
+
+	private int totalUpload;
+	private int done;
+	private int failed;
+	
+	private List<FacesMessage> messages;
+	private Logger log = Logger.getLogger(FileUploadBacking.class);
 	
 	@PostConstruct
 	public void init() {
@@ -55,6 +67,7 @@ public class FileUploadBacking implements Serializable{
 		if(fileTree == null && userModel != null){
 			fileTree = new LocalFileTree(userModel.getUserId());
 		}
+		messages = new ArrayList<FacesMessage>();
 	}
 	
     public void handleFileUpload(FileUploadEvent event) {
@@ -63,8 +76,10 @@ public class FileUploadBacking implements Serializable{
     }
     
     private void fileUpload(FileUploadEvent event, String studyID, String datatype) {
+
+    	totalUpload++;
     	
-    	System.out.println("Handling upload... Folder name is " + fileTree.getSelectFolder().getName());
+    	log.info("Handling upload... Folder name is " + fileTree.getSelectFolder().getName());
 
     	UploadManager uploadManager = new UploadManager();
     	
@@ -80,25 +95,30 @@ public class FileUploadBacking implements Serializable{
 			// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
 			// the function will use UTF-8 by default
 			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectFolder());
-			msg = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
+			msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
-			e.printStackTrace();
-			msg = new FacesMessage("Failure", event.getFile().getFileName() + " failed to upload.  Could not read file.");
+			logStackTrace(e);
+			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , event.getFile().getFileName() + " failed to upload.  Could not read file.");
+			failed++;
 		} catch (UploadFailureException ufe) {
-			ufe.printStackTrace();
-			msg = new FacesMessage("Failure", "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
+			logStackTrace(ufe);
+			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
+			failed++;
 		} catch (Exception ex) {
-			ex.printStackTrace();
-			msg = new FacesMessage("Failure", "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
+			logStackTrace(ex);
+			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
+			failed++;
 		}
 		
-		fileTree.initialize(userModel.getUserId());
+		FacesContext.getCurrentInstance().addMessage("fileUpload", msg);
 		
-		FacesContext.getCurrentInstance().addMessage(null, msg);
+		messages.add(msg);
+		done++;
+		
     }
     
     public void onNodeSelect(NodeSelectEvent event) { 
-    	System.out.println("Node selected... ID is " + fileTree.getSelectedNodeId());
+    	log.info("Node selected... ID is " + fileTree.getSelectedNodeId());
     }
     
     public String getText() {return text;}  
@@ -111,4 +131,55 @@ public class FileUploadBacking implements Serializable{
 	public void setFileTree(LocalFileTree fileTree) {
 		this.fileTree = fileTree;
 	}
+	
+    public void updateProgress() {  
+    	int progress = 0;
+        if(totalUpload > 0){
+        	progress = (100 * done)/totalUpload;
+        }  
+        
+        if(progress > 100){
+        	progress = 100;
+        }
+        RequestContext context = RequestContext.getCurrentInstance();  
+        context.execute("PF(\'pbClient\').setValue("+progress+");");
+         
+    }  
+  
+    public void uploadCompleted() {
+    	Severity severity = FacesMessage.SEVERITY_INFO;
+    	StringBuilder sb = new StringBuilder("<br /><ul>");
+    	for (FacesMessage m : messages) {
+    		if(m.getSeverity().getOrdinal() > severity.getOrdinal()){
+    			severity = m.getSeverity();
+    		}
+    		sb.append("<li>");
+			sb.append(m.getDetail());
+			sb.append("</li>");
+		}
+    	sb.append("</ul>");
+    	
+    	FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(severity, "Upload Completed ["+done+" File(s) - "+failed+" fail(s)]", sb.toString()));
+    	
+    	done = 0;
+    	totalUpload = 0;
+    	failed = 0;
+    	fileTree.initialize(userModel.getUserId());
+    	messages.clear();
+    }  
+    
+    
+    private void logStackTrace(Exception e){
+    	
+    	int lines = 10;
+    	
+    	if(lines > e.getStackTrace().length){
+    		lines = e.getStackTrace().length;
+    	}
+    	
+    	for (int i = 0; i < lines; i++) {
+			log.error(e.getStackTrace()[i]);
+		}
+    	
+    }
 }

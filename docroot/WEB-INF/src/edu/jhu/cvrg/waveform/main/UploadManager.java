@@ -21,16 +21,16 @@ limitations under the License.
 
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Map;
 
 import org.apache.axiom.om.OMElement;
+import org.apache.log4j.Logger;
 
 import com.liferay.faces.portal.context.LiferayFacesContext;
 import com.liferay.portal.kernel.exception.PortalException;
@@ -57,21 +57,21 @@ public class UploadManager {
 	private MetaContainer metaData = new MetaContainer();
 	
 	private User user;
-	EnumFileType fileType;
+	private EnumFileType fileType;
 	
-	long overallStartTime;
-	long fileLoadStartTime;
-	long conversionStartTime;
-	long overallEndTime;
-	long intermediateEndTime;
+	private long overallStartTime;
+	private long fileLoadStartTime;
+	private long conversionStartTime;
+	private long overallEndTime;
+	private long intermediateEndTime;
 	
-	long fileLoadTimeElapsed;
-	long ftpTimeElapsed;
-	long conversionTimeElapsed;
-	long annotationTimeElapsed;
-	long overallTimeElapsed;
+	private long fileLoadTimeElapsed;
+	private long conversionTimeElapsed;
+	private long overallTimeElapsed;
 	
 	private FileEntry wfdbPairFile;
+	
+	private Logger log = Logger.getLogger(UploadManager.class);
 	
 	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, Folder destFolder) throws UploadFailureException {
 
@@ -98,61 +98,46 @@ public class UploadManager {
 		}
 		metaData.setUserID(userId);
 		
-		
 		Folder recordNameFolder = createRecordNameFolder(destFolder, metaData.getRecordName(), user.getUserId());
 		
-		if(recordNameFolder != null) {
-			StringBuilder treePath = new StringBuilder();
-			extractFolderHierachic(recordNameFolder, treePath);
-			metaData.setTreePath(treePath.toString());
-		}
-		else {
-			throw new UploadFailureException("Please select a folder");
-		}
-
-		
-		
 		try {
+			
+			if(recordNameFolder != null) {
+				StringBuilder treePath = new StringBuilder();
+				extractFolderHierachic(recordNameFolder, treePath);
+				metaData.setTreePath(treePath.toString());
+			}else {
+				throw new UploadFailureException("Please select a folder");
+			}
+
 			boolean performConvesion = true;
 			
 			fileLoadStartTime = java.lang.System.currentTimeMillis();
 			fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
 			
-			FileEntry liferayFile = storeFile(fileToSave, fileSize, recordNameFolder);
+			FileEntry liferayFile = null;
+			byte[] bytes = new byte[(int)fileSize];
+			fileToSave.read(bytes);
 			
 			switch (fileType) {
 			case XML:
-
+				
 				StringBuilder xmlString = new StringBuilder();
 				
-				BufferedReader xmlBuf = new BufferedReader(new InputStreamReader(liferayFile.getContentStream()));
-				String line = xmlBuf.readLine();
-				
-				while(line != null) {			
-					if(!(line.contains("!DOCTYPE"))) {
-						xmlString.append(line);
-					}
-					line = xmlBuf.readLine();
-				}
-				
-				xmlBuf.close();
+				xmlString.append(new String(bytes));
 				
 				// check for the first xml tag
 				// if it does not exist, remake the file using UTF-16 
 				// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
 				if(xmlString.indexOf("xml") == -1) {
 					// TODO:  In the future, use a library to check for the encoding that the stream uses
+					xmlString = new StringBuilder(new String(bytes, "UTF-16"));
 					
-					xmlString = new StringBuilder(convertStreamToString(liferayFile.getContentStream(), "UTF-16"));
-					
-					deleteFile(liferayFile);
-					
-					fileToSave = new ByteArrayInputStream(xmlString.toString().getBytes("UTF-16"));
-					
-					liferayFile = storeFile(fileToSave, fileSize, recordNameFolder);
+					if(xmlString.indexOf("xml") == -1) {
+						throw new UploadFailureException("Unexpected file encode.");
+					}
 					
 				}
-				
 				
 				// indicates one of the Philips formats
 				
@@ -175,16 +160,20 @@ public class UploadManager {
 				}else if(xmlString.indexOf("RestingECG") != -1) {
 					fileType = EnumFileType.MUSEXML;
 				}
+				
+				liferayFile = storeFile(bytes, fileSize, recordNameFolder, true);
 				break;
 			case HEA:
-			case DAT:	
+			case DAT:
+				
+				liferayFile = storeFile(bytes, fileSize, recordNameFolder, true);
+				
 				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
 				break;
 			default:
 				break;
 			}
 
-			
 			
 			intermediateEndTime = java.lang.System.currentTimeMillis();
 			
@@ -193,9 +182,9 @@ public class UploadManager {
 			if(performConvesion){
 				convertUploadedFile(userId, liferayFile);
 			}
-
+			
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error(e.getMessage());
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
 		}	
 		
@@ -203,12 +192,12 @@ public class UploadManager {
 		
 		overallTimeElapsed = overallEndTime - overallStartTime;
 		
-		System.out.println("The overall runtime = " + overallTimeElapsed + " milliseconds");
-		System.out.println("The runtime for uploading the file = " + fileLoadTimeElapsed + " milliseconds");
-		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
+		log.info("The overall runtime = " + overallTimeElapsed + " milliseconds");
+		log.info("The runtime for uploading the file = " + fileLoadTimeElapsed + " milliseconds");
+		log.info("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
 	}
 
-	private synchronized Folder createRecordNameFolder(Folder folder, String recordName, Long userId) {
+	private synchronized Folder createRecordNameFolder(Folder folder, String recordName, Long userId) throws UploadFailureException{
 		
 		Folder recordNameFolder = null;
 		Semaphore s = Semaphore.getCreateFolderSemaphore();
@@ -244,7 +233,7 @@ public class UploadManager {
 							recordNameFolder = DLAppLocalServiceUtil.getFolder(folder.getRepositoryId(), folder.getFolderId(), recordName);
 						}catch (Exception e2){
 							Thread.sleep(2000);
-							System.out.println("Sleep and Try Again. #"+(i));
+							log.warn("Sleep and Try Again. #"+(i));
 						}
 					}
 					
@@ -252,17 +241,14 @@ public class UploadManager {
 			}else{
 				recordNameFolder = folder;
 			}
-		} catch (PortalException e) {
-			e.printStackTrace();
-		} catch (SystemException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			throw new UploadFailureException("Error on record name folder's creation.", e);
 		}finally{
 			try {
 				s.release();
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				log.error(e.getMessage());
 			}
 		}
 		return recordNameFolder;
@@ -293,7 +279,7 @@ public class UploadManager {
 		return ret;
 	}
 
-	private void extractFolderHierachic(Folder folder, StringBuilder treePath) {
+	private void extractFolderHierachic(Folder folder, StringBuilder treePath) throws Exception {
 		try {
 			if(folder != null && !"waveform".equals(folder.getName())){
 				if(folder.getParentFolder() != null){
@@ -302,55 +288,37 @@ public class UploadManager {
 				treePath.append('/').append(folder.getName());
 			}
 		} catch (Exception e) {
-			System.err.println("Problems with the folder structure");
+			log.error("Problems with the liferay folder structure");
+			throw e;
 		}
 	}
 
-	private void deleteFile(FileEntry liferayFile) {
-		
-		try {
-			DLAppLocalServiceUtil.deleteFileEntry(liferayFile.getFileEntryId());
-		} catch (PortalException e) {
-			e.printStackTrace();
-		} catch (SystemException e) {
-			e.printStackTrace();
-		}
-		
-	}
-
-	private synchronized FileEntry storeFile(InputStream fileToSave, long fileSize, Folder folder) {
+	private synchronized FileEntry storeFile(byte[] bytes, long fileSize, Folder folder, boolean twice) throws UploadFailureException {
 
 		if (fileSize < Integer.MIN_VALUE || fileSize > Integer.MAX_VALUE) {
 			throw new IllegalArgumentException(fileSize	+ " cannot be cast to int without changing its value.");
 		}
-		
+
 		int fileSizeInt = (int) fileSize;
 		metaData.setFileSize(fileSizeInt);
 		FileEntry file = null;
 		
 		try {
 			
-			byte[] bytes = new byte[fileSizeInt];
-			fileToSave.read(bytes);
-			
 			//TODO [VILARDO] DEFINE THE FILE TYPE
 			ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
 			file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
 			
-			fileToSave.close();
-			
 		} catch(DuplicateFileException e){
 			try {
 				file = DLAppLocalServiceUtil.getFileEntry(ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName());
-			} catch (PortalException e1) {
-				e1.printStackTrace();
-			} catch (SystemException e1) {
-				e1.printStackTrace();
+			} catch (Exception e1){
+				log.error(e1.getMessage());
+				throw new UploadFailureException("Error on file creation", e1);
 			}
-		} catch (IOException e) {
-			e.printStackTrace();
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error(e.getMessage());
+			throw new UploadFailureException("Error on file creation", e);
 		}
 		
 		return file;
@@ -359,95 +327,100 @@ public class UploadManager {
 	private void convertUploadedFile(String uId, FileEntry liferayFile) throws UploadFailureException {
 
 		conversionStartTime = java.lang.System.currentTimeMillis();
+	
+		String method = "na";
+		boolean correctFormat = true;
+
+		switch (fileType) {
+		case RDT:	method = "rdtToWFDB16";					break;
+		case XYZ:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
+		case DAT:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
+		case HEA:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_HEADER);		break;
+		case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ 				break;
+		case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
+		case CSV:	method = "xyFile";						break;
+		case NAT:	method = "na";							break;
+		case GTM:	method = "na";							break;
+		case XML:	method = "hL7";							break;
+		case PHIL103:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
+		case PHIL104:	method = "philips104ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML104);		break;
+		case MUSEXML:	method = "museXML";	metaData.setFileFormat(StudyEntry.MUSEXML);		break;
+		default:	method = "geMuse";						break;
+		}
 		
-			String method = "na";
-			boolean correctFormat = true;
+		if(EnumFileType.HEA.equals(fileType) || EnumFileType.DAT.equals(fileType)) {
+			
+			FileEntry headerFile = liferayFile;
+			if(EnumFileType.DAT.equals(fileType)){
+				headerFile = wfdbPairFile;
+			}
+			// Parse the locally held header file
+			correctFormat = checkWFDBHeader(headerFile);
+		}
+		
+		if(!correctFormat) {
+			throw new UploadFailureException("The header file has not been parsed properly");
+		}
+		
+		log.info("method = " + method);
+		
+		if(ResourceUtility.getNodeConversionService().equals("0")){
+			log.error("Missing Web Service Configuration.  Cannot run File Conversion Web Service.");
+			throw new UploadFailureException("Cannot run File Conversion Web Service. Missing Web Service Configuration.");
+		}
 
+		if(!method.equals("na")){
+		
+			LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
+		
+			parameterMap.put("userid", uId);
+			parameterMap.put("subjectid", 	metaData.getSubjectID());
+			parameterMap.put("filename", 	liferayFile.getTitle());
+			parameterMap.put("studyID", 	metaData.getStudyID());
+			parameterMap.put("datatype", 	metaData.getDatatype());
+			parameterMap.put("treePath", 	metaData.getTreePath());
+			parameterMap.put("recordName", 	metaData.getRecordName());
+			parameterMap.put("fileSize", 	String.valueOf(metaData.getFileSize()));
+			parameterMap.put("fileFormat", 	String.valueOf(metaData.getFileFormat()));
+			
+			parameterMap.put("verbose", 	String.valueOf(false));
+			parameterMap.put("service", 	"DataConversion");
+			
+			parameterMap.put("companyId", 	String.valueOf(ResourceUtility.getCurrentCompanyId()));
+			parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
+			parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
+			
+			LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
+			
 			switch (fileType) {
-			case RDT:	method = "rdtToWFDB16";					break;
-			case XYZ:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
-			case DAT:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
-			case HEA:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_HEADER);		break;
-			case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ 				break;
-			case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
-			case CSV:	method = "xyFile";						break;
-			case NAT:	method = "na";							break;
-			case GTM:	method = "na";							break;
-			case XML:	method = "hL7";							break;
-			case PHIL103:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
-			case PHIL104:	method = "philips104ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML104);		break;
-			case MUSEXML:	method = "museXML";	metaData.setFileFormat(StudyEntry.MUSEXML);		break;
-			default:	method = "geMuse";						break;
+			case HEA:
+				filesMap.put("contentFile", wfdbPairFile);
+				filesMap.put("headerFile", liferayFile);
+				break;
+			case DAT:
+				filesMap.put("contentFile", liferayFile);
+				filesMap.put("headerFile", wfdbPairFile);
+				break;
+			default:
+				filesMap.put("contentFile", liferayFile);
+				break;
 			}
 			
-			if(EnumFileType.HEA.equals(fileType) || EnumFileType.DAT.equals(fileType)) {
-				
-				FileEntry headerFile = liferayFile;
-				if(EnumFileType.DAT.equals(fileType)){
-					headerFile = wfdbPairFile;
-				}
-				// Parse the locally held header file
-				correctFormat = checkWFDBHeader(headerFile);
-			}
-			
-			if(!correctFormat) {
-				throw new UploadFailureException("The header file has not been parsed properly");
-			}
-			
-			System.out.println("method = " + method);
-			
-			if(ResourceUtility.getNodeConversionService().equals("0")){
-				System.out.println("Missing Web Service Configuration.  Cannot run File Conversion Web Service.");
-				return;	
-			}
 
-			if(!method.equals("na")){
+			log.info("Calling Web Service.");
 			
-				LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
+			OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
 			
-				parameterMap.put("userid", uId);
-				parameterMap.put("subjectid", 	metaData.getSubjectID());
-				parameterMap.put("filename", 	liferayFile.getTitle());
-				parameterMap.put("studyID", 	metaData.getStudyID());
-				parameterMap.put("datatype", 	metaData.getDatatype());
-				parameterMap.put("treePath", 	metaData.getTreePath());
-				parameterMap.put("recordName", 	metaData.getRecordName());
-				parameterMap.put("fileSize", 	String.valueOf(metaData.getFileSize()));
-				parameterMap.put("fileFormat", 	String.valueOf(metaData.getFileFormat()));
-				
-				parameterMap.put("verbose", 	String.valueOf(false));
-				parameterMap.put("service", 	"DataConversion");
-				
-				parameterMap.put("companyId", 	String.valueOf(ResourceUtility.getCurrentCompanyId()));
-				parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
-				parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
-				
-				LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
-				
-				switch (fileType) {
-				case HEA:
-					filesMap.put("contentFile", wfdbPairFile);
-					filesMap.put("headerFile", liferayFile);
-					break;
-				case DAT:
-					filesMap.put("contentFile", liferayFile);
-					filesMap.put("headerFile", wfdbPairFile);
-					break;
-				default:
-					filesMap.put("contentFile", liferayFile);
-					break;
-				}
-				
-
-				System.out.println("Calling Web Service.");
-				
-				OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
-				
-				
+			Map<String, OMElement> params = WebServiceUtility.extractParams(result);
+			
+			if(params.get("errorMessage").getText() != null && !params.get("errorMessage").getText().isEmpty()){
+				throw new UploadFailureException(params.get("errorMessage").getText());
 			}
 			
-			intermediateEndTime = java.lang.System.currentTimeMillis();
-			conversionTimeElapsed = intermediateEndTime - conversionStartTime;
+		}
+		
+		intermediateEndTime = java.lang.System.currentTimeMillis();
+		conversionTimeElapsed = intermediateEndTime - conversionStartTime;
 			
 	}
 
@@ -553,7 +526,7 @@ public class UploadManager {
 			}
 
 		}catch (Exception e){ //Catch exception if any
-			System.err.println("Error: " + e.getMessage());
+			log.error("Error: " + e.getMessage());
 			try {
 				if(wfdbInputStream != null) {
 					wfdbInputStream.close();
@@ -562,7 +535,7 @@ public class UploadManager {
 					br.close();
 				}
 			} catch (IOException e2) {
-				System.err.println("Error: " + e2.getMessage());
+				log.error("Error: " + e2.getMessage());
 			}
 			returnValue = false;
 			return returnValue;
@@ -570,13 +543,4 @@ public class UploadManager {
 		return returnValue;
 	}
 
-	private static String convertStreamToString(InputStream is, String encoding) {
-	    Scanner inputScan = new Scanner(is, encoding).useDelimiter("\\A");
-	    if(inputScan.hasNext()) {
-	    	return inputScan.next();
-	    }
-
-	    return "";
-	}
-	
 }
