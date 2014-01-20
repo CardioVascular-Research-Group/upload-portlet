@@ -140,3 +140,29 @@ font-family: helvetica!important;
     border-style: none!important;
     border-width: 0px!important;
 }
+
+
+
+div.westpanel div.ui-widget-content{
+	overflow: hidden!important;	
+}
+
+div.westpanel div.ui-widget-content .nav{
+  	position: relative;
+    text-align: left;
+    width: 100%;
+}
+
+div.westpanel div.ui-widget-content .nav input{
+  	width: 200px;
+}
+div.westpanel div.ui-widget-content .nav button{
+  	margin: 5px 12px 0;
+}
+
+div.westpanel div.ui-widget-content .waveformTree{
+	width: 100%;
+	height: 94%;
+	overflow: auto!important;
+}
+

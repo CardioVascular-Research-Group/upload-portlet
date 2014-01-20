@@ -58,8 +58,8 @@ public class FileUploadBacking implements Serializable{
 	private int done;
 	private int failed;
 	
-	private List<FacesMessage> messages;
 	private Logger log = Logger.getLogger(FileUploadBacking.class);
+	private List<FacesMessage> messages;
 	
 	@PostConstruct
 	public void init() {
@@ -147,29 +147,16 @@ public class FileUploadBacking implements Serializable{
     }  
   
     public void uploadCompleted() {
-    	Severity severity = FacesMessage.SEVERITY_INFO;
-    	StringBuilder sb = new StringBuilder("<br /><ul>");
-    	for (FacesMessage m : messages) {
-    		if(m.getSeverity().getOrdinal() > severity.getOrdinal()){
-    			severity = m.getSeverity();
-    		}
-    		sb.append("<li>");
-			sb.append(m.getDetail());
-			sb.append("</li>");
-		}
-    	sb.append("</ul>");
-    	
-    	FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(severity, "Upload Completed ["+done+" File(s) - "+failed+" fail(s)]", sb.toString()));
+    	ResourceUtility.showMessages("Upload Completed ["+done+" File(s) - "+failed+" fail(s)]", messages);
     	
     	done = 0;
     	totalUpload = 0;
     	failed = 0;
     	fileTree.initialize(userModel.getUserId());
     	messages.clear();
-    }  
-    
-    
-    private void logStackTrace(Exception e){
+    }
+
+	private void logStackTrace(Exception e){
     	
     	int lines = 10;
     	
