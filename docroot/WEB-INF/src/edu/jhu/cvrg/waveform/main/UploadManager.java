@@ -182,7 +182,8 @@ public class UploadManager {
 			if(performConvesion){
 				convertUploadedFile(userId, liferayFile);
 			}
-			
+		} catch (UploadFailureException e){
+			throw e;
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());

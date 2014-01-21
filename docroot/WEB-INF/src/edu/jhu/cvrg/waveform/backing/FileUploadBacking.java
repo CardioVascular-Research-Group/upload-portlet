@@ -26,10 +26,8 @@ import java.util.List;
 
 import javax.annotation.PostConstruct;
 import javax.faces.application.FacesMessage;
-import javax.faces.application.FacesMessage.Severity;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
-import javax.faces.context.FacesContext;
 
 import org.apache.log4j.Logger;
 import org.primefaces.context.RequestContext;
@@ -110,8 +108,6 @@ public class FileUploadBacking implements Serializable{
 			failed++;
 		}
 		
-		FacesContext.getCurrentInstance().addMessage("fileUpload", msg);
-		
 		messages.add(msg);
 		done++;
 		
@@ -169,4 +165,9 @@ public class FileUploadBacking implements Serializable{
 		}
     	
     }
+	
+	public User getUser(){
+		return userModel;
+	}
+
 }
