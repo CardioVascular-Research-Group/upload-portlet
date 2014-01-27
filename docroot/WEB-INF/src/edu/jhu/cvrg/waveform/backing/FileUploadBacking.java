@@ -40,6 +40,7 @@ import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.main.UploadManager;
 import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
+import edu.jhu.cvrg.waveform.utility.ServerUtility;
 
 @ManagedBean(name="fileUploadBacking")
 @ViewScoped
@@ -95,15 +96,15 @@ public class FileUploadBacking implements Serializable{
 			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectFolder());
 			msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
-			logStackTrace(e);
+			ServerUtility.logStackTrace(e, log);
 			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , event.getFile().getFileName() + " failed to upload.  Could not read file.");
 			failed++;
 		} catch (UploadFailureException ufe) {
-			logStackTrace(ufe);
+			ServerUtility.logStackTrace(ufe, log);
 			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
 			failed++;
 		} catch (Exception ex) {
-			logStackTrace(ex);
+			ServerUtility.logStackTrace(ex, log);
 			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
 			failed++;
 		}
@@ -128,7 +129,7 @@ public class FileUploadBacking implements Serializable{
 		this.fileTree = fileTree;
 	}
 	
-    public void updateProgress() {  
+    public void updateProgressBar() {  
     	int progress = 0;
         if(totalUpload > 0){
         	progress = (100 * done)/totalUpload;
@@ -139,10 +140,9 @@ public class FileUploadBacking implements Serializable{
         }
         RequestContext context = RequestContext.getCurrentInstance();  
         context.execute("PF(\'pbClient\').setValue("+progress+");");
-         
     }  
   
-    public void uploadCompleted() {
+    public void onComplete() {
     	ResourceUtility.showMessages("Upload Completed ["+done+" File(s) - "+failed+" fail(s)]", messages);
     	
     	done = 0;
@@ -150,20 +150,6 @@ public class FileUploadBacking implements Serializable{
     	failed = 0;
     	fileTree.initialize(userModel.getUserId());
     	messages.clear();
-    }
-
-	private void logStackTrace(Exception e){
-    	
-    	int lines = 10;
-    	
-    	if(lines > e.getStackTrace().length){
-    		lines = e.getStackTrace().length;
-    	}
-    	
-    	for (int i = 0; i < lines; i++) {
-			log.error(e.getStackTrace()[i]);
-		}
-    	
     }
 	
 	public User getUser(){

@@ -3,11 +3,11 @@
         window['progress'] = setInterval(function() {  
             var pbClient = PF('pbClient');  
               
-            updateProgress();  
+            updateProgressBar();  
   
             if(pbClient.getValue() === 100) {  
                 clearInterval(window['progress']);
-                uploadCompleted();
+                onComplete();
             }  
   
         }, 1000);  

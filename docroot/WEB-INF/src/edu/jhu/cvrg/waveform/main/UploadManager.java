@@ -49,8 +49,6 @@ import edu.jhu.cvrg.waveform.utility.EnumFileType;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
-// This is for Philips 1.03 format
-// This is for Philips 1.04 format
 
 public class UploadManager {
 
@@ -98,18 +96,8 @@ public class UploadManager {
 		}
 		metaData.setUserID(userId);
 		
-		Folder recordNameFolder = createRecordNameFolder(destFolder, metaData.getRecordName(), user.getUserId());
-		
 		try {
 			
-			if(recordNameFolder != null) {
-				StringBuilder treePath = new StringBuilder();
-				extractFolderHierachic(recordNameFolder, treePath);
-				metaData.setTreePath(treePath.toString());
-			}else {
-				throw new UploadFailureException("Please select a folder");
-			}
-
 			boolean performConvesion = true;
 			
 			fileLoadStartTime = java.lang.System.currentTimeMillis();
@@ -161,14 +149,16 @@ public class UploadManager {
 					fileType = EnumFileType.MUSEXML;
 				}
 				
-				liferayFile = storeFile(bytes, fileSize, recordNameFolder, true);
+				liferayFile = saveFile(fileSize, destFolder, bytes);
+				
 				break;
 			case HEA:
 			case DAT:
 				
-				liferayFile = storeFile(bytes, fileSize, recordNameFolder, true);
+				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
 				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
+				
 				break;
 			default:
 				break;
@@ -198,10 +188,20 @@ public class UploadManager {
 		log.info("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
 	}
 
+	private FileEntry saveFile(long fileSize, Folder destFolder, byte[] bytes) throws UploadFailureException {
+		
+		Folder recordNameFolder = createRecordNameFolder(destFolder, metaData.getRecordName(), user.getUserId());
+		return  storeFile(bytes, fileSize, recordNameFolder, true);
+		
+	}
+
 	private synchronized Folder createRecordNameFolder(Folder folder, String recordName, Long userId) throws UploadFailureException{
 		
 		Folder recordNameFolder = null;
 		Semaphore s = Semaphore.getCreateFolderSemaphore();
+		
+		recordName = ResourceUtility.convertToLiferayDocName(recordName);
+		
 		try {
 			s.take();
 			long folderId;
@@ -242,6 +242,15 @@ public class UploadManager {
 			}else{
 				recordNameFolder = folder;
 			}
+			
+			if(recordNameFolder != null) {
+				StringBuilder treePath = new StringBuilder();
+				extractFolderHierachic(recordNameFolder, treePath);
+				metaData.setTreePath(treePath.toString());
+			}else {
+				throw new UploadFailureException("Please select a folder");
+			}
+			
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("Error on record name folder's creation.", e);
@@ -252,6 +261,7 @@ public class UploadManager {
 				log.error(e.getMessage());
 			}
 		}
+		
 		return recordNameFolder;
 	}
 

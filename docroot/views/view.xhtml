@@ -42,6 +42,10 @@
 							<p:treeNode type="document" icon="ui-icon ui-icon-document">
 								<h:outputText value="#{node}"/>
 							</p:treeNode>
+							
+							<p:treeNode type="document_error" icon="ui-icon ui-icon-alert">
+								<h:outputText value="#{node}"/>
+							</p:treeNode>
 						</p:tree>
 					
 		    	</p:layoutUnit>
@@ -52,8 +56,8 @@
 			    	
 			    	<p:messages id="messages_prime" showSummary="true" showDetail="true" autoUpdate="true" closable="true" escape="false" />
 			    	
-			    	<p:remoteCommand name="updateProgress" action="#{fileUploadBacking.updateProgress}" />
-			    	<p:remoteCommand name="uploadCompleted" action="#{fileUploadBacking.uploadCompleted}" update="fileTree"/>
+			    	<p:remoteCommand name="updateProgressBar" action="#{fileUploadBacking.updateProgressBar}" />
+			    	<p:remoteCommand name="onComplete" action="#{fileUploadBacking.onComplete}" update="fileTree"/>
 			    	
 			    	<p:fileUpload id="uploader"
 			                      	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
