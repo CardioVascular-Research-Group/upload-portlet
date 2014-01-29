@@ -96,15 +96,18 @@ public class FileUploadBacking implements Serializable{
 			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectFolder());
 			msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded.");
 		} catch (IOException e) {
-			ServerUtility.logStackTrace(e, log);
+			//ServerUtility.logStackTrace(e, log);
+			e.printStackTrace();
 			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , event.getFile().getFileName() + " failed to upload.  Could not read file.");
 			failed++;
 		} catch (UploadFailureException ufe) {
-			ServerUtility.logStackTrace(ufe, log);
+			//ServerUtility.logStackTrace(ufe, log);
+			ufe.printStackTrace();
 			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
 			failed++;
 		} catch (Exception ex) {
-			ServerUtility.logStackTrace(ex, log);
+			//ServerUtility.logStackTrace(ex, log);
+			ex.printStackTrace();
 			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "The file " + event.getFile().getFileName() + " failed to upload for unknown reasons");
 			failed++;
 		}
