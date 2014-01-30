@@ -25,6 +25,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,7 +123,7 @@ public class UploadManager {
 					xmlString = new StringBuilder(new String(bytes, "UTF-16"));
 					
 					if(xmlString.indexOf("xml") == -1) {
-						throw new UploadFailureException("Unexpected file encode.");
+						throw new UploadFailureException("Unexpected file.");
 					}
 					
 				}
@@ -153,7 +154,18 @@ public class UploadManager {
 				
 				break;
 			case HEA:
+				
+				checkHeaFile(bytes, metaData.getRecordName(), fileSize);
+				
+				liferayFile = saveFile(fileSize, destFolder, bytes);
+				
+				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
+				
+				break;
+				
 			case DAT:
+				
+				checkDatFile(bytes);
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
@@ -176,7 +188,7 @@ public class UploadManager {
 			throw e;
 		} catch (Exception e) {
 			log.error(e.getMessage());
-			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
+			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
 		}	
 		
 		overallEndTime = java.lang.System.currentTimeMillis();
@@ -186,6 +198,114 @@ public class UploadManager {
 		log.info("The overall runtime = " + overallTimeElapsed + " milliseconds");
 		log.info("The runtime for uploading the file = " + fileLoadTimeElapsed + " milliseconds");
 		log.info("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
+	}
+
+	private void checkDatFile(byte[] bytes) throws UploadFailureException {
+		boolean isBinary = false;
+		
+		int bytesToAnalyze = Double.valueOf(bytes.length*0.3).intValue();
+		
+		int encodeErrorLimit = Double.valueOf(bytesToAnalyze*0.2).intValue();
+		int encodeErrorCount = 0;
+		
+		for (int j = 0; j < bytesToAnalyze; j++) {
+			
+			int c = (int) bytes[j]; 
+			if(c == 9 || c == 10 || c == 13 || (c >= 32 && c <= 126) ){
+				isBinary = false;
+			} else {
+				//System.out.print(c + " " + (char) c);
+				isBinary = true;
+				if(encodeErrorCount == encodeErrorLimit ){
+					break;	
+				}else{
+					encodeErrorCount++;
+				}
+			}
+		}
+		
+		if (!isBinary) {
+			encodeErrorCount = 0;
+			
+			try {
+				String s = new String(bytes, "UTF-16");
+				for (int j = 0; j < s.length(); j++) {
+					
+					int c = (int) (s.charAt(j)); 
+					if(c == 9 || c == 10 || c == 13 || (c >= 32 && c <= 126) ){
+						isBinary =  false;
+					} else {
+						isBinary = true;
+						if(encodeErrorCount == encodeErrorLimit ){
+							break;	
+						}else{
+							encodeErrorCount++;
+						}
+					}
+				}
+			} catch (UnsupportedEncodingException e) {
+				isBinary = true;
+			}
+		}
+		
+		if(!isBinary){
+			throw new UploadFailureException("Unexpected file.");
+		}
+	}
+
+	private void checkHeaFile(byte[] bytes, String recordName, long fileSize) throws UploadFailureException {
+		boolean valid = false;
+		
+		StringBuilder line = new StringBuilder();
+		int lineNumber = 0;
+		int leadTotal = 0;
+		int leadOnFile = 0;
+		
+		for (int i = 0; i < fileSize; i++) {
+			
+			char s = (char)bytes[i];
+			
+			line.append(s);
+			
+			if(s == '\n'){
+				
+				if(lineNumber > 0 && leadTotal == leadOnFile){
+					break;
+				}
+				
+				String[] headerInfo = line.toString().split(" ");
+				
+				valid = (headerInfo != null && headerInfo.length >= 2);
+				if(!valid) break;
+				
+				if(lineNumber == 0){
+					String fileRecordName = headerInfo[0];
+					int index = fileRecordName.lastIndexOf('/');
+					if(index != -1){
+						fileRecordName = fileRecordName.substring(0, index);
+					}
+					
+					valid = (recordName.equals(fileRecordName));
+					if(!valid) break;
+
+					leadTotal = Integer.valueOf(headerInfo[1]);
+					
+				}else if(lineNumber > 0 && valid){
+					leadOnFile++;
+				}
+				
+				line.delete(0, line.length()-1);
+				lineNumber++;
+			}
+		}
+		if(valid){
+			valid = leadTotal == leadOnFile;
+		}
+		
+		if(!valid){
+			throw new UploadFailureException("Unexpected file.");
+		}
+		
 	}
 
 	private FileEntry saveFile(long fileSize, Folder destFolder, byte[] bytes) throws UploadFailureException {
