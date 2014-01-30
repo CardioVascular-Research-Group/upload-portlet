@@ -542,7 +542,15 @@ public class UploadManager {
 			
 			OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
 			
+			if(result == null){
+				throw new UploadFailureException("Webservice return is null.");
+			}
+			
 			Map<String, OMElement> params = WebServiceUtility.extractParams(result);
+			
+			if(params == null){
+				throw new UploadFailureException("Webservice return params are null.");
+			}
 			
 			if(params.get("errorMessage").getText() != null && !params.get("errorMessage").getText().isEmpty()){
 				throw new UploadFailureException(params.get("errorMessage").getText());
