@@ -29,7 +29,6 @@ import javax.faces.application.FacesMessage;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
 
-import org.apache.log4j.Logger;
 import org.primefaces.context.RequestContext;
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
@@ -44,7 +43,7 @@ import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 @ManagedBean(name="fileUploadBacking")
 @ViewScoped
 
-public class FileUploadBacking implements Serializable{
+public class FileUploadBacking extends BackingBean implements Serializable{
 	
 	private static final long serialVersionUID = -4715402539808469047L;
 	
@@ -56,7 +55,6 @@ public class FileUploadBacking implements Serializable{
 	private int done;
 	private int failed;
 	
-	private Logger log = Logger.getLogger(FileUploadBacking.class);
 	private List<FacesMessage> messages;
 	
 	@PostConstruct
@@ -77,7 +75,7 @@ public class FileUploadBacking implements Serializable{
 
     	totalUpload++;
     	
-    	log.info("Handling upload... Folder name is " + fileTree.getSelectFolder().getName());
+    	getLog().info("Handling upload... Folder name is " + fileTree.getSelectFolder().getName());
 
     	UploadManager uploadManager = new UploadManager();
     	
@@ -117,7 +115,7 @@ public class FileUploadBacking implements Serializable{
     }
     
     public void onNodeSelect(NodeSelectEvent event) { 
-    	log.info("Node selected... ID is " + fileTree.getSelectedNodeId());
+    	getLog().info("Node selected... ID is " + fileTree.getSelectedNodeId());
     }
     
     public String getText() {return text;}  
@@ -157,5 +155,5 @@ public class FileUploadBacking implements Serializable{
 	public User getUser(){
 		return userModel;
 	}
-
+	
 }
