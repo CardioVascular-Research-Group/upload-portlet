@@ -43,10 +43,10 @@ import com.liferay.portal.service.ServiceContext;
 import com.liferay.portlet.documentlibrary.DuplicateFileException;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
+import edu.jhu.cvrg.dbapi.enums.EnumFileExtension;
+import edu.jhu.cvrg.dbapi.enums.EnumFileType;
 import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
-import edu.jhu.cvrg.dbapi.factory.exists.model.StudyEntry;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
-import edu.jhu.cvrg.waveform.utility.EnumFileType;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
@@ -102,13 +102,14 @@ public class UploadManager {
 			boolean performConvesion = true;
 			
 			fileLoadStartTime = java.lang.System.currentTimeMillis();
-			fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
+			
+			EnumFileExtension extension = EnumFileExtension.valueOf(extension(metaData.getFileName()).toUpperCase());
 			
 			FileEntry liferayFile = null;
 			byte[] bytes = new byte[(int)fileSize];
 			fileToSave.read(bytes);
 			
-			switch (fileType) {
+			switch (extension) {
 			case XML:
 				
 				StringBuilder xmlString = new StringBuilder();
@@ -136,10 +137,10 @@ public class UploadManager {
 				
 				if(xmlString.indexOf("restingecgdata") != -1) {						
 					if(xmlString.indexOf("<documentversion>1.03</documentversion>") != -1) {
-						fileType = EnumFileType.PHIL103;
+						fileType = EnumFileType.PHILIPS_103;
 					}
 					else if(xmlString.indexOf("<documentversion>1.04</documentversion>") != -1) {
-						fileType = EnumFileType.PHIL104;
+						fileType = EnumFileType.PHILIPS_104;
 					}
 					else {
 						throw new UploadFailureException("Unrecognized version number for Philips file");
@@ -147,7 +148,9 @@ public class UploadManager {
 				
 				// indicates GE Muse 7
 				}else if(xmlString.indexOf("RestingECG") != -1) {
-					fileType = EnumFileType.MUSEXML;
+					fileType = EnumFileType.MUSE_XML;
+				}else{
+					fileType = EnumFileType.HL7;
 				}
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
@@ -159,7 +162,9 @@ public class UploadManager {
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
-				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
+				performConvesion = this.checkWFDBFiles(liferayFile, extension);
+				
+				fileType = EnumFileType.WFDB;
 				
 				break;
 				
@@ -169,7 +174,9 @@ public class UploadManager {
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
-				performConvesion = this.checkWFDBFiles(liferayFile, fileType);
+				performConvesion = this.checkWFDBFiles(liferayFile, extension);
+				
+				fileType = EnumFileType.WFDB;
 				
 				break;
 			default:
@@ -182,7 +189,7 @@ public class UploadManager {
 			fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
 			
 			if(performConvesion){
-				convertUploadedFile(userId, liferayFile);
+				convertUploadedFile(userId, liferayFile, extension);
 			}
 		} catch (UploadFailureException e){
 			throw e;
@@ -385,7 +392,7 @@ public class UploadManager {
 		return recordNameFolder;
 	}
 
-	private boolean checkWFDBFiles(FileEntry liferayFile, EnumFileType fileType2) throws PortalException, SystemException {
+	private boolean checkWFDBFiles(FileEntry liferayFile, EnumFileExtension fileExtension) throws PortalException, SystemException {
 		
 		boolean ret = false;
 		
@@ -393,12 +400,12 @@ public class UploadManager {
 		List<FileEntry> subFiles = DLAppLocalServiceUtil.getFileEntries(ResourceUtility.getCurrentGroupId(), folderId);
 		if(subFiles != null){
 			for (FileEntry file : subFiles) {
-				if(EnumFileType.HEA.equals(fileType)){	
+				if(EnumFileExtension.HEA.equals(fileExtension)){	
 					ret = file.getTitle().substring(0, file.getTitle().indexOf('.')).equals(liferayFile.getTitle().substring(0, file.getTitle().indexOf('.'))) && 
-					   	  EnumFileType.DAT.toString().equalsIgnoreCase(file.getExtension());
-				}else if(EnumFileType.DAT.equals(fileType)){
+							EnumFileExtension.DAT.toString().equalsIgnoreCase(file.getExtension());
+				}else if(EnumFileExtension.DAT.equals(fileExtension)){
 					ret = file.getTitle().substring(0, file.getTitle().indexOf('.')).equals(liferayFile.getTitle().substring(0, file.getTitle().indexOf('.'))) && 
-					   	  EnumFileType.HEA.toString().equalsIgnoreCase(file.getExtension());
+							EnumFileExtension.HEA.toString().equalsIgnoreCase(file.getExtension());
 				}
 				
 				if(ret){
@@ -455,7 +462,7 @@ public class UploadManager {
 		return file;
 	}
 
-	private void convertUploadedFile(String uId, FileEntry liferayFile) throws UploadFailureException {
+	private void convertUploadedFile(String uId, FileEntry liferayFile, EnumFileExtension fileExtension) throws UploadFailureException {
 
 		conversionStartTime = java.lang.System.currentTimeMillis();
 	
@@ -463,99 +470,108 @@ public class UploadManager {
 		boolean correctFormat = true;
 
 		switch (fileType) {
-		case RDT:	method = "rdtToWFDB16";					break;
-		case XYZ:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
-		case DAT:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
-		case HEA:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_HEADER);		break;
-		case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ 				break;
-		case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
-		case CSV:	method = "xyFile";						break;
-		case NAT:	method = "na";							break;
-		case GTM:	method = "na";							break;
-		case XML:	method = "hL7";							break;
-		case PHIL103:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
-		case PHIL104:	method = "philips104ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML104);		break;
-		case MUSEXML:	method = "museXML";	metaData.setFileFormat(StudyEntry.MUSEXML);		break;
-		default:	method = "geMuse";						break;
+			case WFDB:			method = "wfdbToRDT"; 			break;
+			case HL7:			method = "hL7";					break;
+			case PHILIPS_103:	method = "philips103ToWFDB";	break;
+			case PHILIPS_104:	method = "philips104ToWFDB";	break;
+			case MUSE_XML:		method = "museXML";				break;
+			default:	
+				switch (fileExtension) {
+					case RDT:	method = "rdtToWFDB16";					break;
+					case XYZ:	method = "wfdbToRDT"; 		fileType = EnumFileType.WFDB;		break;
+					case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ break;
+					case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
+					case CSV:	method = "xyFile";						break;
+					case NAT:	method = "na";							break;
+					case GTM:	method = "na";							break;
+					default:	method = "geMuse";						break;
+				}
+			break;
 		}
 		
-		if(EnumFileType.HEA.equals(fileType) || EnumFileType.DAT.equals(fileType)) {
-			
-			FileEntry headerFile = liferayFile;
-			if(EnumFileType.DAT.equals(fileType)){
-				headerFile = wfdbPairFile;
-			}
-			// Parse the locally held header file
-			correctFormat = checkWFDBHeader(headerFile);
-		}
+		if(fileType != null){
+			metaData.setFileFormat(fileType.ordinal());
 		
-		if(!correctFormat) {
-			throw new UploadFailureException("The header file has not been parsed properly");
-		}
-		
-		log.info("method = " + method);
-		
-		if(ResourceUtility.getNodeConversionService().equals("0")){
-			log.error("Missing Web Service Configuration.  Cannot run File Conversion Web Service.");
-			throw new UploadFailureException("Cannot run File Conversion Web Service. Missing Web Service Configuration.");
-		}
-
-		if(!method.equals("na")){
-		
-			LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
-		
-			parameterMap.put("userid", uId);
-			parameterMap.put("subjectid", 	metaData.getSubjectID());
-			parameterMap.put("filename", 	liferayFile.getTitle());
-			parameterMap.put("studyID", 	metaData.getStudyID());
-			parameterMap.put("datatype", 	metaData.getDatatype());
-			parameterMap.put("treePath", 	metaData.getTreePath());
-			parameterMap.put("recordName", 	metaData.getRecordName());
-			parameterMap.put("fileSize", 	String.valueOf(metaData.getFileSize()));
-			parameterMap.put("fileFormat", 	String.valueOf(metaData.getFileFormat()));
-			
-			parameterMap.put("verbose", 	String.valueOf(false));
-			parameterMap.put("service", 	"DataConversion");
-			
-			parameterMap.put("companyId", 	String.valueOf(ResourceUtility.getCurrentCompanyId()));
-			parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
-			parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
-			
-			LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
-			
-			switch (fileType) {
-			case HEA:
-				filesMap.put("contentFile", wfdbPairFile);
-				filesMap.put("headerFile", liferayFile);
-				break;
-			case DAT:
-				filesMap.put("contentFile", liferayFile);
-				filesMap.put("headerFile", wfdbPairFile);
-				break;
-			default:
-				filesMap.put("contentFile", liferayFile);
-				break;
+			if(EnumFileExtension.HEA.equals(fileExtension) || EnumFileExtension.DAT.equals(fileExtension)) {
+				
+				FileEntry headerFile = liferayFile;
+				if(EnumFileExtension.DAT.equals(fileExtension)){
+					headerFile = wfdbPairFile;
+				}
+				// Parse the locally held header file
+				correctFormat = checkWFDBHeader(headerFile);
 			}
 			
-
-			log.info("Calling Web Service.");
-			
-			OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
-			
-			if(result == null){
-				throw new UploadFailureException("Webservice return is null.");
+			if(!correctFormat) {
+				throw new UploadFailureException("The header file has not been parsed properly");
 			}
 			
-			Map<String, OMElement> params = WebServiceUtility.extractParams(result);
+			log.info("method = " + method);
 			
-			if(params == null){
-				throw new UploadFailureException("Webservice return params are null.");
+			if(ResourceUtility.getNodeConversionService().equals("0")){
+				log.error("Missing Web Service Configuration.  Cannot run File Conversion Web Service.");
+				throw new UploadFailureException("Cannot run File Conversion Web Service. Missing Web Service Configuration.");
 			}
+	
+			if(!method.equals("na")){
 			
-			if(params.get("errorMessage").getText() != null && !params.get("errorMessage").getText().isEmpty()){
-				throw new UploadFailureException(params.get("errorMessage").getText());
+				LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
+			
+				parameterMap.put("userid", uId);
+				parameterMap.put("subjectid", 	metaData.getSubjectID());
+				parameterMap.put("filename", 	liferayFile.getTitle());
+				parameterMap.put("studyID", 	metaData.getStudyID());
+				parameterMap.put("datatype", 	metaData.getDatatype());
+				parameterMap.put("treePath", 	metaData.getTreePath());
+				parameterMap.put("recordName", 	metaData.getRecordName());
+				parameterMap.put("fileSize", 	String.valueOf(metaData.getFileSize()));
+				parameterMap.put("fileFormat", 	String.valueOf(metaData.getFileFormat()));
+				
+				parameterMap.put("verbose", 	String.valueOf(false));
+				parameterMap.put("service", 	"DataConversion");
+				
+				parameterMap.put("companyId", 	String.valueOf(ResourceUtility.getCurrentCompanyId()));
+				parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
+				parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
+				
+				LinkedHashMap<String, FileEntry> filesMap = new LinkedHashMap<String, FileEntry>();
+				
+				switch (fileExtension) {
+				case HEA:
+					filesMap.put("contentFile", wfdbPairFile);
+					filesMap.put("headerFile", liferayFile);
+					break;
+				case DAT:
+					filesMap.put("contentFile", liferayFile);
+					filesMap.put("headerFile", wfdbPairFile);
+					break;
+				default:
+					filesMap.put("contentFile", liferayFile);
+					break;
+				}
+				
+	
+				log.info("Calling Web Service.");
+				
+				OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
+				
+				if(result == null){
+					throw new UploadFailureException("Webservice return is null.");
+				}
+				
+				Map<String, OMElement> params = WebServiceUtility.extractParams(result);
+				
+				if(params == null){
+					throw new UploadFailureException("Webservice return params are null.");
+				}
+				
+				if(params.get("errorMessage").getText() != null && !params.get("errorMessage").getText().isEmpty()){
+					throw new UploadFailureException(params.get("errorMessage").getText());
+				}
+				
 			}
-			
+		}else{
+			throw new UploadFailureException("Unidentified file format/type.");
 		}
 		
 		intermediateEndTime = java.lang.System.currentTimeMillis();
