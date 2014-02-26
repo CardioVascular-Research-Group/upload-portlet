@@ -6,4 +6,5 @@
 *.ear
 /build
 /bin
+*/WEB-INF/classes
 
