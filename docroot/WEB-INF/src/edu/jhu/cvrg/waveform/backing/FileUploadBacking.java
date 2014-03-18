@@ -36,7 +36,9 @@ import org.primefaces.event.NodeSelectEvent;
 import com.liferay.portal.model.User;
 
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
+import edu.jhu.cvrg.waveform.exception.UploadFailureException.Level;
 import edu.jhu.cvrg.waveform.main.UploadManager;
+import edu.jhu.cvrg.waveform.model.FileTreeNode;
 import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 
@@ -88,10 +90,16 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			String fileName = event.getFile().getFileName();
 			long fileSize = event.getFile().getSize();
 
-			// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
-			// the function will use UTF-8 by default
-			uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectFolder());
-			msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded.");
+			FileTreeNode existingFileNode = fileTree.getLeafByName(fileName);
+			
+			if( existingFileNode == null){
+				// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
+				// the function will use UTF-8 by default
+				uploadManager.processUploadedFile(fileToSave, fileName, fileSize, studyID, datatype, fileTree.getSelectFolder());
+				msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded.");
+			}else{
+				throw new UploadFailureException("This file already exist at " + existingFileNode.getTreePath() +" folder.");
+			}
 		} catch (IOException e) {
 			//ServerUtility.logStackTrace(e, log);
 			e.printStackTrace();
@@ -100,8 +108,13 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 		} catch (UploadFailureException ufe) {
 			//ServerUtility.logStackTrace(ufe, log);
 			ufe.printStackTrace();
-			msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
-			failed++;
+			if(Level.ERROR.equals(ufe.getLevel())){
+				msg = new FacesMessage(FacesMessage.SEVERITY_ERROR, "" , "Uploading " + event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
+				failed++;
+			}else{
+				msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded. "+ ufe.getMessage());	
+			}
+			
 		} catch (Exception ex) {
 			//ServerUtility.logStackTrace(ex, log);
 			ex.printStackTrace();

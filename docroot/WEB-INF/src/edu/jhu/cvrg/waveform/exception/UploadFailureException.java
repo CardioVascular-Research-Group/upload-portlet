@@ -1,8 +1,11 @@
 package edu.jhu.cvrg.waveform.exception;
 
+
 public class UploadFailureException extends Exception {
 
 	private static final long serialVersionUID = -1874260566891662284L;
+	
+	private Level level = Level.ERROR;
 
 	public UploadFailureException() {
 		// TODO Auto-generated constructor stub
@@ -11,6 +14,11 @@ public class UploadFailureException extends Exception {
 	public UploadFailureException(String message) {
 		super(message);
 		// TODO Auto-generated constructor stub
+	}
+	
+	public UploadFailureException(String message, Level level) {
+		super(message);
+		this.level = level;
 	}
 
 	public UploadFailureException(Throwable cause) {
@@ -29,4 +37,13 @@ public class UploadFailureException extends Exception {
 		// TODO Auto-generated constructor stub
 	}
 
+	public Level getLevel() {
+		return level;
+	}
+
+	
+	public enum Level{
+		ERROR,
+		INFO;
+	}
 }

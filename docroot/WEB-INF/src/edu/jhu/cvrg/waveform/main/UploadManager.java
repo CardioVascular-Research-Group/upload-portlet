@@ -47,6 +47,7 @@ import edu.jhu.cvrg.dbapi.enums.EnumFileExtension;
 import edu.jhu.cvrg.dbapi.enums.EnumFileType;
 import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
+import edu.jhu.cvrg.waveform.exception.UploadFailureException.Level;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
@@ -190,6 +191,8 @@ public class UploadManager {
 			
 			if(performConvesion){
 				convertUploadedFile(userId, liferayFile, extension);
+			}else{
+				throw new UploadFailureException("Incomplete ECG, waiting files.", Level.INFO);
 			}
 		} catch (UploadFailureException e){
 			throw e;
@@ -448,12 +451,9 @@ public class UploadManager {
 			file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
 			
 		} catch(DuplicateFileException e){
-			try {
-				file = DLAppLocalServiceUtil.getFileEntry(ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName());
-			} catch (Exception e1){
-				log.error(e1.getMessage());
-				throw new UploadFailureException("Error on file creation", e1);
-			}
+			log.error(e.getMessage());
+			throw new UploadFailureException("This file already exist.", e);
+		
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("Error on file creation", e);
