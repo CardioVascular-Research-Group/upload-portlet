@@ -10,21 +10,17 @@
 	<h:head />
 	<h:body>
 
-	<h:panelGroup layout="block" id="uploadTopContentLineShade" styleClass="topLineShade" rendered="#{fileUploadBacking.user == null}"> 
-   		<h:outputText styleClass="TitleLine" value="ICM Electrocardiograph Tool Kit: Uploadd" />
-   	</h:panelGroup>
-	
 	<h:form id="formUpload" enctype="multipart/form-data">
 		
 		<h:panelGroup rendered="#{fileUploadBacking.user != null}">
 			<p:layout id="layoutUpload" style="width:100%;height:500px" >
-		 		<p:layoutUnit styleClass="westpanel" position="west" header="Select or Create Upload Folder" resizable="true" size="350" minSize="350" maxSize="600" >
+		 		<p:layoutUnit styleClass="westpanel" position="west" header="Select or Create Upload Folder" resizable="true" size="350" minSize="350" maxSize="600">
 		 			    
 		 			    <div class="nav">
 		                    <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
 		                    <p:commandButton  id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
 		                </div>              
-		
+
 						<p:tree id="fileTree" 
 							styleClass="waveformTree"
 							dynamic="true"
@@ -51,7 +47,6 @@
 								<h:outputText value="#{node}"/>
 							</p:treeNode>
 						</p:tree>
-					
 		    	</p:layoutUnit>
 		    	
 		    	<p:layoutUnit position="center" header="Select files form your computer to upload and save" >
@@ -76,6 +71,11 @@
 			                      	onstart="cancel();start()" />
 			                      	
 					   
+			    </p:layoutUnit>
+			    
+			    <p:layoutUnit styleClass="westpanel" position="south" header="Instructions" resizable="true">
+			     terse instruction text goes here. <BR/>
+			    Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. <BR/>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. <BR/>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. <BR/>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 			    </p:layoutUnit>
 			</p:layout>
 		</h:panelGroup>
