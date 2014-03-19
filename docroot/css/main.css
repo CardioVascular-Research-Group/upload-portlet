@@ -132,7 +132,7 @@ font-family: helvetica!important;
 }
 
 .ui-tree{
-	border:0!important;	
+	border:0;	
 }
 
 .noTableBorder, .noTableBorder tr, .noTableBorder td {
@@ -144,7 +144,7 @@ font-family: helvetica!important;
 
 
 div.westpanel div.ui-widget-content{
-	overflow: hidden!important;	
+/*	overflow: scroll; */	
 }
 
 div.westpanel div.ui-widget-content .nav{
@@ -162,8 +162,9 @@ div.westpanel div.ui-widget-content .nav button{
 
 div.westpanel div.ui-widget-content .waveformTree{
 	width: 100%;
-	height: 94%;
-	overflow: auto!important;
+/* 	height: 94%;*/
+	height: 300px;
+	overflow: auto;
 }
 
 div.signin{
