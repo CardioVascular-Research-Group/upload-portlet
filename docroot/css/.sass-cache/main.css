@@ -118,7 +118,7 @@
   font-family: helvetica!important; }
 
 .ui-tree {
-  border: 0; }
+  border: 0!important; }
 
 .noTableBorder, .noTableBorder tr, .noTableBorder td {
   border-color: inherit;
@@ -126,7 +126,7 @@
   border-width: 0px!important; }
 
 div.westpanel div.ui-widget-content {
-  /*	overflow: scroll; */ }
+  overflow: hidden!important; }
 
 div.westpanel div.ui-widget-content .nav {
   position: relative;
@@ -141,9 +141,8 @@ div.westpanel div.ui-widget-content .nav button {
 
 div.westpanel div.ui-widget-content .waveformTree {
   width: 100%;
-  /* 	height: 94%;*/
-  height: 300px;
-  overflow: auto; }
+  height: 94%;
+  overflow: auto!important; }
 
 div.signin {
   text-align: center; }
