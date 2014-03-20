@@ -162,8 +162,10 @@ div.westpanel div.ui-widget-content .nav button{
 
 div.westpanel div.ui-widget-content .waveformTree{
 	width: 100%;
-	height: 94%;
-	overflow: auto!important;
+/* 	height: 94%;*/
+
+	height: 300px;
+	overflow: auto;
 }
 
 div.signin{
