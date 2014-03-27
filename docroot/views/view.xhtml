@@ -56,13 +56,6 @@
 		    	
 		    	<p:layoutUnit position="center" header="Select files form your computer to upload and save" >
 			    	
-			    	<p:progressBar id="progressBarClient" widgetVar="pbClient" style="width:99%" styleClass="animated" labelTemplate="{value}%"/>
-			    	
-			    	<p:messages id="messages_prime" showSummary="true" showDetail="true" autoUpdate="true" closable="true" escape="false" />
-			    	
-			    	<p:remoteCommand name="updateProgressBar" action="#{fileUploadBacking.updateProgressBar}" />
-			    	<p:remoteCommand name="onComplete" action="#{fileUploadBacking.onComplete}" update="fileTree"/>
-			    	
 			    	<p:fileUpload id="uploader"
 			                      	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
 			                      	value="Facts" 
@@ -72,12 +65,56 @@
 			          	            auto="false"
 			              	        widgetVar="waveformFileUpload"
 			                  	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
-			                      	description="Select Images"
-			                      	onstart="cancel();start()" />
-			                      	
-					   
+			                      	description="Select Images" 
+			                      	onstart="startListening();"/>
+			    </p:layoutUnit>
+			    
+			    
+			    <p:layoutUnit position="east" collapsible="true" header="Background Queue" resizable="true" collapsed="#{!fileUploadBacking.showBackgroundPanel}" minSize="400" >
+			    
+					<p:remoteCommand name="onComplete" action="#{fileUploadBacking.onComplete}" update="fileTree"/>
+			    	<p:remoteCommand name="loadBackgroundQueue" action="#{fileUploadBacking.loadBackgroundQueue}" update="divBackgroundQueuePanel"/>
+			    
+			    	<h:panelGroup layout="block" id="divBackgroundQueuePanel">
+			    	
+			    		<h:panelGroup layout="block" rendered="#{fileUploadBacking.summary != null}" id="summary" styleClass="summary">
+				    		<span>#{fileUploadBacking.summary}</span>
+					    	<p:commandLink styleClass="ui-icon ui-icon-close remove" oncomplete="removeAll();" update="backgroundQueue" actionListener="#{fileUploadBacking.removeAllDoneItem}"/>
+				    	</h:panelGroup>
+			    	
+				    	<p:dataTable id="backgroundQueue"
+								var="item"
+								rowIndexVar="index"
+								value="#{fileUploadBacking.backgroundQueue}"
+								style="width:100%"
+								emptyMessage="No background process."
+								>
+				    	
+				    		<p:column headerText="Subject" width="39%" styleClass="recordName">
+				    			<span><h:outputText value="#{item.recordName}" /></span>
+							</p:column>
+							
+							<p:column headerText="Progress" width="35%">
+								<progress value="#{item.progress}" max="100"></progress>
+							</p:column>
+							
+							<p:column headerText="Phase" width="26%" styleClass="queuePhaseColumn">
+								<span title="#{item.message != null ? item.message : ''}" class="#{item.message != null ? 'error' : ''}"><h:outputText value="#{item.state}" /></span>
+								<p:commandLink styleClass="ui-icon ui-icon-close" update="backgroundQueue" actionListener="#{fileUploadBacking.removeTableItem}" rendered="#{item.progress == 100}">
+									<f:param name="index" value="#{index}"/>
+								</p:commandLink>
+							</p:column>
+						</p:dataTable>
+			    	
+			    	</h:panelGroup>
+			    
+			    	
+			    
 			    </p:layoutUnit>
 			</p:layout>
+			<script>
+				startListening(true);
+			</script>
 		</h:panelGroup>
 		
 		<h:panelGroup rendered="#{fileUploadBacking.user == null}">

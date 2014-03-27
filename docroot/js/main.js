@@ -1,19 +1,94 @@
-    function start() {  
-        
-        window['progress'] = setInterval(function() {  
-            var pbClient = PF('pbClient');  
-              
-            updateProgressBar();  
+
+	var totalFiles = 0;
+
+	
+	function startListening(onLoad) {
+		
+		$('#uploader').fileupload({
+            dropZone: $('.ui-fileupload-content')
+         });
+		
+		if(onLoad == null){
+			onLoad = false;
+		}
+		
+		if(onLoad){
+			var phaseColumns = $('td.queuePhaseColumn span');
+			totalFiles = phaseColumns.length;
+			
+			var continueListening = check(phaseColumns);
+        	
+        	if(continueListening) {
+        		startPooler();
+        	}
+        }else{
+        	totalFiles+=$('table.ui-fileupload-files tr').length;
+        	
+        	startPooler();
+			showBackgroundPanel();
+		}
+	    
+    }  
   
-            if(pbClient.getValue() === 100) {  
-                clearInterval(window['progress']);
-                onComplete();
+	function startPooler(){
+		window['progress'] = setInterval(function() {  
+            
+        	var phaseColumns = $('td.queuePhaseColumn span');
+        	var activeCount = phaseColumns.length;
+        	
+        	var continueListening = check(phaseColumns);
+        	
+            if(continueListening) {
+            	showBackgroundPanel();
+            	loadBackgroundQueue();
+            }else{
+            	loadBackgroundQueue();
+            	totalFiles = activeCount; 
+            	stopListening();
             }  
-  
+            
         }, 1000);  
+	}
+	
+	
+	function check(phaseColumns){
+		
+		var continueListening = null;
+		
+		var waitCount = 0;
+		for(var i = 0; i < phaseColumns.length; i++){
+    		continueListening = !(phaseColumns[i].innerHTML == 'DONE' || phaseColumns[i].innerHTML == 'ERROR' || phaseColumns[i].innerHTML == 'WAIT');
+    		
+    		if(continueListening){
+    			break;
+    		}
+    		
+    		if(phaseColumns[i].innerHTML == 'WAIT'){
+    			waitCount++;
+    		}
+    	}
+		
+		return ($('table.ui-fileupload-files tr').length > 0 || (phaseColumns.length) < (totalFiles)) || (continueListening != null && continueListening);
+	}
+	
+    function stopListening() {  
+        clearInterval(window['progress']);
+        onComplete();
     }  
-  
-    function cancel() {  
-        clearInterval(window['progress']);  
-        PF('pbClient').setValue(0);  
-    }  
+    
+    
+    function showBackgroundPanel(){
+    	if($('div.ui-layout-resizer-east-closed').length > 0){
+			$('.ui-layout-resizer-east .ui-layout-unit-expand-icon').click();	
+		}
+    }
+    
+    function removeFile(){
+    	if(totalFiles > 0){
+    		totalFiles--;
+    	}
+    }
+    
+    function removeAll(){
+    	$('div.summary').remove();
+    }

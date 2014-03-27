@@ -39,56 +39,71 @@ import com.liferay.portal.kernel.exception.SystemException;
 import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.repository.model.Folder;
 import com.liferay.portal.model.User;
+import com.liferay.portal.security.auth.PrincipalThreadLocal;
+import com.liferay.portal.security.permission.PermissionChecker;
+import com.liferay.portal.security.permission.PermissionCheckerFactoryUtil;
+import com.liferay.portal.security.permission.PermissionThreadLocal;
 import com.liferay.portal.service.ServiceContext;
+import com.liferay.portal.service.UserLocalServiceUtil;
 import com.liferay.portlet.documentlibrary.DuplicateFileException;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
+import edu.jhu.cvrg.dbapi.dto.UploadStatusDTO;
 import edu.jhu.cvrg.dbapi.enums.EnumFileExtension;
 import edu.jhu.cvrg.dbapi.enums.EnumFileType;
+import edu.jhu.cvrg.dbapi.factory.Connection;
+import edu.jhu.cvrg.dbapi.factory.ConnectionFactory;
 import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
-import edu.jhu.cvrg.waveform.exception.UploadFailureException.Level;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 
-public class UploadManager {
+public class UploadManager extends Thread{
 
 	private MetaContainer metaData = new MetaContainer();
 	
 	private User user;
 	private EnumFileType fileType;
 	
-	private long overallStartTime;
-	private long fileLoadStartTime;
-	private long conversionStartTime;
-	private long overallEndTime;
-	private long intermediateEndTime;
-	
-	private long fileLoadTimeElapsed;
-	private long conversionTimeElapsed;
-	private long overallTimeElapsed;
+	private long validationTime;
 	
 	private FileEntry wfdbPairFile;
 	
+	private FileEntry liferayFile; 
+	private EnumFileExtension fileExtension;
+	private UploadStatusDTO dto;
+	private long companyId;
 	private Logger log = Logger.getLogger(UploadManager.class);
 	
-	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, Folder destFolder) throws UploadFailureException {
+	Connection db = null;
+	
+	@Override
+	public void run() {
+		try {
+			this.convertUploadedFile();
+		} catch (Exception e) {
+			if(db!=null){
+				dto.setStatus(Boolean.FALSE);
+				dto.setMessage(e.getMessage());
+				db.storeUploadStatus(dto);
+			}else{
+				e.printStackTrace();	
+			}
+		}
+	}
+	
+	public UploadStatusDTO processUploadedFile(InputStream fileToSave, String fileName, String recordName, long fileSize, String studyID, String datatype, Folder destFolder) throws UploadFailureException {
 
-		overallStartTime = java.lang.System.currentTimeMillis();
+		validationTime = java.lang.System.currentTimeMillis();
+		
+		companyId = ResourceUtility.getCurrentCompanyId();
 		
 		metaData.setFileName(fileName);
 		metaData.setStudyID(studyID);
 		metaData.setDatatype(datatype);
-		int location = metaData.getFileName().indexOf(".");
-
-		if (location != -1) {
-			metaData.setSubjectID(metaData.getFileName().substring(0, location));
-		} else {
-			metaData.setSubjectID(metaData.getFileName());
-		}
-		
-		metaData.setRecordName(metaData.getSubjectID());
+		metaData.setSubjectID(recordName);
+		metaData.setRecordName(recordName);
 		
 		user = ResourceUtility.getCurrentUser();
 		
@@ -102,15 +117,12 @@ public class UploadManager {
 			
 			boolean performConvesion = true;
 			
-			fileLoadStartTime = java.lang.System.currentTimeMillis();
+			fileExtension = EnumFileExtension.valueOf(extension(metaData.getFileName()).toUpperCase());
 			
-			EnumFileExtension extension = EnumFileExtension.valueOf(extension(metaData.getFileName()).toUpperCase());
-			
-			FileEntry liferayFile = null;
 			byte[] bytes = new byte[(int)fileSize];
 			fileToSave.read(bytes);
 			
-			switch (extension) {
+			switch (fileExtension) {
 			case XML:
 				
 				StringBuilder xmlString = new StringBuilder();
@@ -163,7 +175,7 @@ public class UploadManager {
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
-				performConvesion = this.checkWFDBFiles(liferayFile, extension);
+				performConvesion = this.checkWFDBFiles(liferayFile, fileExtension);
 				
 				fileType = EnumFileType.WFDB;
 				
@@ -175,7 +187,7 @@ public class UploadManager {
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
-				performConvesion = this.checkWFDBFiles(liferayFile, extension);
+				performConvesion = this.checkWFDBFiles(liferayFile, fileExtension);
 				
 				fileType = EnumFileType.WFDB;
 				
@@ -184,30 +196,22 @@ public class UploadManager {
 				break;
 			}
 
-			
-			intermediateEndTime = java.lang.System.currentTimeMillis();
-			
-			fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
-			
 			if(performConvesion){
-				convertUploadedFile(userId, liferayFile, extension);
+				validationTime = java.lang.System.currentTimeMillis() - validationTime;
+				dto = new UploadStatusDTO(null, null, null, validationTime, null, null, null);
+				dto.setRecordName(metaData.getSubjectID());
 			}else{
-				throw new UploadFailureException("Incomplete ECG, waiting files.", Level.INFO);
+				dto = new UploadStatusDTO(null, null, null, null, null, null, "Incomplete ECG, waiting files.");
+				dto.setRecordName(metaData.getSubjectID());
 			}
+			return dto;
+			
 		} catch (UploadFailureException e){
 			throw e;
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
-		}	
-		
-		overallEndTime = java.lang.System.currentTimeMillis();
-		
-		overallTimeElapsed = overallEndTime - overallStartTime;
-		
-		log.info("The overall runtime = " + overallTimeElapsed + " milliseconds");
-		log.info("The runtime for uploading the file = " + fileLoadTimeElapsed + " milliseconds");
-		log.info("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
+		}
 	}
 
 	private void checkDatFile(byte[] bytes) throws UploadFailureException {
@@ -462,12 +466,13 @@ public class UploadManager {
 		return file;
 	}
 
-	private void convertUploadedFile(String uId, FileEntry liferayFile, EnumFileExtension fileExtension) throws UploadFailureException {
-
-		conversionStartTime = java.lang.System.currentTimeMillis();
+	public UploadStatusDTO convertUploadedFile() throws UploadFailureException {
 	
 		String method = "na";
 		boolean correctFormat = true;
+		
+		initializeLiferayPermissionChecker(user.getUserId());
+		db = ConnectionFactory.createConnection();
 
 		switch (fileType) {
 			case WFDB:			method = "wfdbToRDT"; 			break;
@@ -517,7 +522,7 @@ public class UploadManager {
 			
 				LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
 			
-				parameterMap.put("userid", uId);
+				parameterMap.put("userid", String.valueOf(user.getUserId()));
 				parameterMap.put("subjectid", 	metaData.getSubjectID());
 				parameterMap.put("filename", 	liferayFile.getTitle());
 				parameterMap.put("studyID", 	metaData.getStudyID());
@@ -530,7 +535,7 @@ public class UploadManager {
 				parameterMap.put("verbose", 	String.valueOf(false));
 				parameterMap.put("service", 	"DataConversion");
 				
-				parameterMap.put("companyId", 	String.valueOf(ResourceUtility.getCurrentCompanyId()));
+				parameterMap.put("companyId", 	String.valueOf(companyId));
 				parameterMap.put("groupId", 	String.valueOf(liferayFile.getGroupId()));
 				parameterMap.put("folderId", 	String.valueOf(liferayFile.getFolderId()));
 				
@@ -553,7 +558,11 @@ public class UploadManager {
 	
 				log.info("Calling Web Service.");
 				
+				long conversionTime = java.lang.System.currentTimeMillis();
+				
 				OMElement result = WebServiceUtility.callWebService(parameterMap, false, method, ResourceUtility.getNodeConversionService(), null, filesMap);
+				
+				conversionTime = java.lang.System.currentTimeMillis() - conversionTime;
 				
 				if(result == null){
 					throw new UploadFailureException("Webservice return is null.");
@@ -563,20 +572,31 @@ public class UploadManager {
 				
 				if(params == null){
 					throw new UploadFailureException("Webservice return params are null.");
+				}else{
+					if(params.get("documentId").getText() != null){
+						long docId = Long.parseLong(params.get("documentId").getText());
+						
+						log.info("["+docId+"]The runtime file validation is = " + validationTime + " milliseconds");
+						log.info("["+docId+"]The runtime for WS tranfer, read and store the document on database is = " + conversionTime + " milliseconds");
+						
+						dto.setDocumentRecordId(docId);
+						dto.setTransferReadTime(conversionTime);
+						
+						db.storeUploadStatus(dto);
+						
+						return dto;
+						
+					}else if(params.get("errorMessage").getText() != null && !params.get("errorMessage").getText().isEmpty()){
+						throw new UploadFailureException(params.get("errorMessage").getText());
+					}	
+					
 				}
-				
-				if(params.get("errorMessage").getText() != null && !params.get("errorMessage").getText().isEmpty()){
-					throw new UploadFailureException(params.get("errorMessage").getText());
-				}
-				
 			}
 		}else{
 			throw new UploadFailureException("Unidentified file format/type.");
 		}
-		
-		intermediateEndTime = java.lang.System.currentTimeMillis();
-		conversionTimeElapsed = intermediateEndTime - conversionStartTime;
 			
+		return null;
 	}
 
 	// TODO: make this into a function which determines which kind of text file
@@ -696,6 +716,18 @@ public class UploadManager {
 			return returnValue;
 		}	
 		return returnValue;
+	}
+	
+	private void initializeLiferayPermissionChecker(long userId) throws UploadFailureException {
+		try{
+			PrincipalThreadLocal.setName(userId);
+			User user = UserLocalServiceUtil.getUserById(userId);
+	        PermissionChecker permissionChecker = PermissionCheckerFactoryUtil.create(user);
+	        PermissionThreadLocal.setPermissionChecker(permissionChecker);
+		}catch (Exception e){
+			throw new UploadFailureException("Fail on premission checker initialization. [userId="+userId+"]", e);
+		}
+		
 	}
 
 }
