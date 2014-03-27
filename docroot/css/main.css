@@ -1,3 +1,83 @@
+/*.ui-menuitem.ui-widget.ui-corner-all:nth-child(2)
+{
+border-top-width: 2px;
+border-right-width-value: 1px;
+border-bottom-width: 1px;
+border-left-width-value: 1px;
+border-top-style: solid;
+border-right-style-value: solid;
+border-bottom-style: solid;
+border-left-style-value: solid;
+border-top-color: white;
+border-right-color-value: #2CA1CB;
+border-bottom-color: #CCC;
+border-left-color-value: #2CA1CB;
+-moz-box-shadow: 0 0 10px white,0 3px 0 #0E3871,0 5px 0 white,0 5px 3px #CCC;
+-webkit-box-shadow: 0 0 10px white,0 3px 0 #0E3871,0 5px 0 white,0 5px 3px #CCC;
+box-shadow: 0 0 10px white,0 3px 0 #0E3871,0 5px 0 white,0 5px 3px #CCC;
+background-color: #3DB6E3;
+-moz-border-radius: 5px;
+-webkit-border-radius: 5px;
+}
+
+.fileupload-content:after {
+    position: relative;
+    font-weight: bold;
+    left: 11px;
+    font-size: 11pt;
+    color: #CCCCCC;
+    font-family: Calibri;
+    content:"Note: This browser window also allows for you to Drag and Drop files from your computer desktop to this interface for easy uploading.";
+    height: 400px !important;
+    width:100%!important;
+    }
+    
+    .fileupload-content {
+    height: 400px !important;
+    border:0!important;
+    border-size:0!important;
+    
+    }
+
+.fileupload-buttonbar{
+font-size: 8pt;
+
+}
+
+
+
+.fileupload-content {
+    height: 400px !important;
+    border: 0 !important;
+    border-size: 0 !important;
+}
+
+.fileupload-buttonbar {
+    font-size: 8pt;
+}
+
+.ui-button-text{
+font-size:8pt;
+size:8pt;
+border:0!important;
+border-size:0!important;
+font-family: helvetica!important;
+}
+
+.ui-tree{
+	border:0;	
+}
+
+.noTableBorder, .noTableBorder tr, .noTableBorder td {
+    border-color: inherit;
+    border-style: none!important;
+    border-width: 0px!important;
+}
+
+*/
+
+
+/*********************************************************************************/
 .ui-menuitem.ui-widget.ui-corner-all:nth-child(2)
 {
 border-top-width: 2px;
@@ -46,42 +126,21 @@ background-color: #3DB6E3;
 	font-size:10pt; 
 }
 
-.template-upload {
-border:0!important;
-border-size:0!important;
-}
     
-.fileupload-content:after {
-    position: relative;
-    font-weight: bold;
-    left: 11px;
-    font-size: 11pt;
-    color: #CCCCCC;
-    font-family: Calibri;
-    content:"Note: This browser window also allows for you to Drag and Drop files from your computer desktop to this interface for easy uploading.";
-    height: 400px !important;
-    width:100%!important;
-    }
     
-    .fileupload-content {
+.fileupload-content {
     height: 400px !important;
     border:0!important;
     border-size:0!important;
     
-    }
+}
 
 .fileupload-buttonbar{
 font-size: 8pt;
 
 }
 
-#j_idt2:formUpload { height:500px;  }
 
-.fileupload-content:after {
- position:relative; font-weight:bold; left:11px; font-size:10pt; color:#CCCCCC; font-family:Calibri;
-  content: "Note: This browser window also allows for you to Drag and Drop files from your computer desktop to this interface for easy uploading.";
-  height:400px!important;
-}
 .fileupload-content{
   height:400px!important;
 }
@@ -94,11 +153,6 @@ font-size: 8pt;
     font-family: Calibri;
 }
 
-
-.template-upload {
-    border: 0 !important;
-    border-size: 0 !important;
-}
 
 .fileupload-content:after {
     position: relative;
@@ -141,10 +195,8 @@ font-family: helvetica!important;
     border-width: 0px!important;
 }
 
-
-
 div.westpanel div.ui-widget-content{
-	overflow: hidden!important;	
+/*	overflow: hidden!important; */	
 }
 
 div.westpanel div.ui-widget-content .nav{
@@ -162,8 +214,8 @@ div.westpanel div.ui-widget-content .nav button{
 
 div.westpanel div.ui-widget-content .waveformTree{
 	width: 100%;
-	height: 94%;
-	overflow: auto!important;
+	height: 300px;
+	overflow: auto;
 }
 
 div.signin{
