@@ -173,7 +173,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
     		sb.append("Summary ").append(backgroundQueue.size());
     		
     		if(backgroundQueue.size() > 1){
-    			sb.append(" itens [");
+    			sb.append(" items [");
     		}else{
     			sb.append(" item [");
     		}

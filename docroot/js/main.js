@@ -87,6 +87,9 @@
     	if(totalFiles > 0){
     		totalFiles--;
     	}
+    	if(totalFiles == 0){
+    		removeAll();
+    	}
     }
     
     function removeAll(){
