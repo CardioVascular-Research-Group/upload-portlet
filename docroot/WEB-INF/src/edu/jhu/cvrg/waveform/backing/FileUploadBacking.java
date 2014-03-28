@@ -227,7 +227,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
         if(backgroundQueue != null){
         	boolean stopListening = false;
         	for (UploadStatusDTO u : backgroundQueue) {
-        		stopListening = (EnumUploadState.DONE.equals(u.getState()) || EnumUploadState.ERROR.equals(u.getState()) || EnumUploadState.WAIT.equals(u.getState()));
+        		stopListening = (EnumUploadState.DONE.equals(u.getState()) || EnumUploadState.ERROR.equals(u.getState()) );
         		if(!stopListening){
         			break;
         		}
@@ -255,7 +255,9 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			}
 			int index = this.getBackgroundQueue().indexOf(dto);
 			if(index != -1){
-				if(EnumUploadState.WAIT.equals(this.getBackgroundQueue().get(index).getState())){
+				UploadStatusDTO older = this.getBackgroundQueue().get(index);
+				if(EnumUploadState.WAIT.equals(older.getState()) || 
+				   EnumUploadState.ERROR.equals(older.getState())){
 					this.getBackgroundQueue().remove(index);	
 				}
 			}

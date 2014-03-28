@@ -1,6 +1,6 @@
 
 	var totalFiles = 0;
-
+	var progressTimer;
 	
 	function startListening(onLoad) {
 		
@@ -31,23 +31,25 @@
     }  
   
 	function startPooler(){
-		window['progress'] = setInterval(function() {  
-            
-        	var phaseColumns = $('td.queuePhaseColumn span');
-        	var activeCount = phaseColumns.length;
-        	
-        	var continueListening = check(phaseColumns);
-        	
-            if(continueListening) {
-            	showBackgroundPanel();
-            	loadBackgroundQueue();
-            }else{
-            	loadBackgroundQueue();
-            	totalFiles = activeCount; 
-            	stopListening();
-            }  
-            
-        }, 1000);  
+		if(progressTimer == null){
+			progressTimer = setInterval(function() {  
+	            
+	        	var phaseColumns = $('td.queuePhaseColumn span');
+	        	var activeCount = phaseColumns.length;
+	        	
+	        	var continueListening = check(phaseColumns);
+	        	
+	            if(continueListening) {
+	            	showBackgroundPanel();
+	            	loadBackgroundQueue();
+	            }else{
+	            	loadBackgroundQueue();
+	            	totalFiles = activeCount; 
+	            	stopListening();
+	            }  
+	            
+	        }, 1000);  
+		}
 	}
 	
 	
@@ -71,8 +73,10 @@
 		return ($('table.ui-fileupload-files tr').length > 0 || (phaseColumns.length) < (totalFiles)) || (continueListening != null && continueListening);
 	}
 	
-    function stopListening() {  
-        clearInterval(window['progress']);
+    function stopListening() {
+    	if(progressTimer != null){
+    		clearInterval(progressTimer);	
+    	}
         onComplete();
     }  
     
