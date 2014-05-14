@@ -162,6 +162,11 @@ public class UploadManager extends Thread{
 				// indicates GE Muse 7
 				}else if(xmlString.indexOf("RestingECG") != -1) {
 					fileType = EnumFileType.MUSE_XML;
+				
+				// indicates Schiller
+				}else if(xmlString.indexOf("examdescript") != -1) {
+					fileType = EnumFileType.SCHILLER;
+				
 				}else{
 					fileType = EnumFileType.HL7;
 				}
@@ -479,6 +484,7 @@ public class UploadManager extends Thread{
 			case HL7:			method = "hL7";					break;
 			case PHILIPS_103:	method = "philips103ToWFDB";	break;
 			case PHILIPS_104:	method = "philips104ToWFDB";	break;
+			case SCHILLER:	    method = "SCHILLERToWFDB";   	break;
 			case MUSE_XML:		method = "museXML";				break;
 			default:	
 				switch (fileExtension) {
@@ -556,7 +562,7 @@ public class UploadManager extends Thread{
 				}
 				
 	
-				log.info("Calling Web Service.");
+				log.info("Calling Web Service with " + liferayFile.getTitle() + ".");
 				
 				long conversionTime = java.lang.System.currentTimeMillis();
 				
@@ -725,7 +731,7 @@ public class UploadManager extends Thread{
 	        PermissionChecker permissionChecker = PermissionCheckerFactoryUtil.create(user);
 	        PermissionThreadLocal.setPermissionChecker(permissionChecker);
 		}catch (Exception e){
-			throw new UploadFailureException("Fail on premission checker initialization. [userId="+userId+"]", e);
+			throw new UploadFailureException("Fail on permission checker initialization. [userId="+userId+"]", e);
 		}
 		
 	}

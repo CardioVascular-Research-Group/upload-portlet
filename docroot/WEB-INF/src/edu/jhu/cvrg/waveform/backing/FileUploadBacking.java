@@ -115,7 +115,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 					}
 				}
 			}else{
-				throw new UploadFailureException("This file already exist at " + existingFileNode.getTreePath() +" folder.");
+				throw new UploadFailureException("This file already exists at " + existingFileNode.getTreePath() +" folder.");
 			}
 		} catch (IOException e) {
 			status = new UploadStatusDTO(null, null, null, null, null, Boolean.FALSE, event.getFile().getFileName() + " failed to upload.  Could not read file.");
