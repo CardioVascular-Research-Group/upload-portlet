@@ -163,7 +163,7 @@ public class UploadManager extends Thread{
 				}else if(xmlString.indexOf("RestingECG") != -1) {
 					fileType = EnumFileType.MUSE_XML;
 				
-				// indicates Schiller
+				// indicates Schiller 
 				}else if(xmlString.indexOf("examdescript") != -1) {
 					fileType = EnumFileType.SCHILLER;
 				
