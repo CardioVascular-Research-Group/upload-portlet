@@ -491,7 +491,7 @@ public class UploadManager extends Thread{
 					case RDT:	method = "rdtToWFDB16";					break;
 					case XYZ:	method = "wfdbToRDT"; 		fileType = EnumFileType.WFDB;		break;
 					case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ break;
-					case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
+					case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/*currently a stub method -  will eventually process GE MUSE Text files*/	break;
 					case CSV:	method = "xyFile";						break;
 					case NAT:	method = "na";							break;
 					case GTM:	method = "na";							break;
