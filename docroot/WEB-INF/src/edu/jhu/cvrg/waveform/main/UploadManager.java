@@ -211,6 +211,13 @@ public class UploadManager extends Thread{
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
+		}finally{
+			try {
+				fileToSave.close();
+			} catch (IOException e) {
+				log.error(e.getMessage());
+				e.printStackTrace();
+			}
 		}
 	}
 
