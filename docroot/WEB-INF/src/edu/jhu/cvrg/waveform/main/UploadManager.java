@@ -130,6 +130,8 @@ public class UploadManager extends Thread{
 				
 				String encoding = xmlSniffer.getXmlEncoding();
 				
+				log.info("Character encoding is " + encoding);
+				
 				StringBuilder xmlString = new StringBuilder(new String(bytes, encoding));
 				
 				// indicates one of the Philips formats

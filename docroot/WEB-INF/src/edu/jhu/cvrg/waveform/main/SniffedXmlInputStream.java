@@ -78,8 +78,13 @@ public class SniffedXmlInputStream extends BufferedInputStream
            // either ASCII or EBDIC style.
 
            // Therefore, we must use UTF-8.
+    	   
+    	   // Waveform Modification [Benitez]:  Due to the fact that Philips files come as UTF-16 by default, the default for this
+    	   // will be changed accordingly.  The reason for this change is that in the XML declaration for Philips files, UTF-16 is declared in
+    	   // lower case for some reason, which throws off the check completely. This may need to be revisited in the future if a new format comes up
+    	   // that doesn't conform to this.
 
-           _encoding = "UTF-8";
+           _encoding = "UTF-16";
        }
    }
 
