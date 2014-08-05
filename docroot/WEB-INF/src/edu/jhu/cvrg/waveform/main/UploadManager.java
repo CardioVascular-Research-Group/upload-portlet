@@ -112,7 +112,6 @@ public class UploadManager extends Thread{
 			userId = user.getEmailAddress();
 		}
 		metaData.setUserID(userId);
-		SniffedXmlInputStream xmlSniffer = null;
 		
 		try {
 			
@@ -126,13 +125,22 @@ public class UploadManager extends Thread{
 			switch (fileExtension) {
 			case XML:
 				
-				xmlSniffer = new SniffedXmlInputStream(fileToSave);
+				StringBuilder xmlString = new StringBuilder();
 				
-				String encoding = xmlSniffer.getXmlEncoding();
-				
-				log.info("Character encoding is " + encoding);
-				
-				StringBuilder xmlString = new StringBuilder(new String(bytes, encoding));
+				xmlString.append(new String(bytes));
+ 				
+ 				// check for the first xml tag
+ 				// if it does not exist, remake the file using UTF-16 
+ 				// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
+ 				if(xmlString.indexOf("xml") == -1) {
+ 					// TODO:  In the future, use a library to check for the encoding that the stream uses
+ 					xmlString = new StringBuilder(new String(bytes, "UTF-16"));
+ 					
+ 					if(xmlString.indexOf("xml") == -1) {
+ 						throw new UploadFailureException("Unexpected file.");
+ 					}
+ 					
+				}
 				
 				// indicates one of the Philips formats
 				
@@ -210,9 +218,6 @@ public class UploadManager extends Thread{
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
 		} finally {
 			try {
-				if(xmlSniffer != null) {
-					xmlSniffer.close();
-				}
 				fileToSave.close();
 			} catch (IOException e) {
 				log.error(e.getMessage());

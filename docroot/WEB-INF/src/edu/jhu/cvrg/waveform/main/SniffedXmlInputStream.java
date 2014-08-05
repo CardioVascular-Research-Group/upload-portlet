@@ -25,6 +25,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
 
+@Deprecated
 public class SniffedXmlInputStream extends BufferedInputStream
 {
    // We don't sniff more than 192 bytes.
