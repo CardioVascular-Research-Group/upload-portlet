@@ -59,6 +59,8 @@ import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 
+import org.apache.commons.io.input.XmlStreamReader;
+
 public class UploadManager extends Thread{
 
 	private MetaContainer metaData = new MetaContainer();
@@ -113,6 +115,8 @@ public class UploadManager extends Thread{
 		}
 		metaData.setUserID(userId);
 		
+		XmlStreamReader xmlDecoder = null;
+		
 		try {
 			
 			boolean performConvesion = true;
@@ -124,16 +128,23 @@ public class UploadManager extends Thread{
 			
 			switch (fileExtension) {
 			case XML:
+				xmlDecoder = new XmlStreamReader(fileToSave);
 				
-				StringBuilder xmlString = new StringBuilder();
+				String encoding = xmlDecoder.getEncoding();
 				
-				xmlString.append(new String(bytes));
+				log.info("The XML encoding is " + encoding);
+				
+				StringBuilder xmlString = new StringBuilder(new String(bytes, encoding));
+				
+				//xmlString.append(new String(bytes));
  				
  				// check for the first xml tag
- 				// if it does not exist, remake the file using UTF-16 
- 				// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
+ 				// if it does not exist, remake the file using UTF-16
+				// This section is done primarily in the case of Philips files, since their encoding is listed
+				// as "utf-16" instead of "UTF-16"
+				
+				// This may need to be revisited in the future if other formatting issues like this crop up
  				if(xmlString.indexOf("xml") == -1) {
- 					// TODO:  In the future, use a library to check for the encoding that the stream uses
  					xmlString = new StringBuilder(new String(bytes, "UTF-16"));
  					
  					if(xmlString.indexOf("xml") == -1) {
@@ -218,6 +229,9 @@ public class UploadManager extends Thread{
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
 		} finally {
 			try {
+				if(xmlDecoder != null) {
+					xmlDecoder.close();
+				}
 				fileToSave.close();
 			} catch (IOException e) {
 				log.error(e.getMessage());
