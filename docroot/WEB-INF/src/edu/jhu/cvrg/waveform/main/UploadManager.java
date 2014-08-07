@@ -128,15 +128,10 @@ public class UploadManager extends Thread{
 			
 			switch (fileExtension) {
 			case XML:
-				xmlDecoder = new XmlStreamReader(fileToSave);
 				
-				String encoding = xmlDecoder.getEncoding();
+				StringBuilder xmlString = new StringBuilder();
 				
-				log.info("The XML encoding is " + encoding);
-				
-				StringBuilder xmlString = new StringBuilder(new String(bytes, encoding));
-				
-				//xmlString.append(new String(bytes));
+				xmlString.append(new String(bytes));
  				
  				// check for the first xml tag
  				// if it does not exist, remake the file using UTF-16
