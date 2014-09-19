@@ -193,3 +193,15 @@ div.westpanel div.ui-widget-content .waveformTree {
 div.signin {
   text-align: center; }
 
+div.ui-fileupload {
+  height: 100%; }
+
+td.queuePhaseColumn span, div.summary span, td.recordName div, td.recordName span {
+  float: left; }
+
+td.queuePhaseColumn a, div.summary a {
+  float: right; }
+
+td.queuePhaseColumn span.error {
+  font-weight: bold!important; }
+
