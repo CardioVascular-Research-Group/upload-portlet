@@ -48,12 +48,12 @@ import com.liferay.portal.service.UserLocalServiceUtil;
 import com.liferay.portlet.documentlibrary.DuplicateFileException;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
-import edu.jhu.cvrg.dbapi.dto.UploadStatusDTO;
-import edu.jhu.cvrg.dbapi.enums.EnumFileExtension;
-import edu.jhu.cvrg.dbapi.enums.EnumFileType;
-import edu.jhu.cvrg.dbapi.factory.Connection;
-import edu.jhu.cvrg.dbapi.factory.ConnectionFactory;
-import edu.jhu.cvrg.dbapi.factory.exists.model.MetaContainer;
+import edu.jhu.cvrg.data.dto.UploadStatusDTO;
+import edu.jhu.cvrg.data.enums.FileExtension;
+import edu.jhu.cvrg.data.enums.FileType;
+import edu.jhu.cvrg.data.factory.Connection;
+import edu.jhu.cvrg.data.factory.ConnectionFactory;
+import edu.jhu.cvrg.data.util.DataStorageException;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
@@ -61,22 +61,28 @@ import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 
 public class UploadManager extends Thread{
 
-	private MetaContainer metaData = new MetaContainer();
-	
 	private User user;
-	private EnumFileType fileType;
+	private FileType fileType;
 	
 	private long validationTime;
 	
 	private FileEntry wfdbPairFile;
 	
 	private FileEntry liferayFile; 
-	private EnumFileExtension fileExtension;
+	private FileExtension fileExtension;
 	private UploadStatusDTO dto;
 	private long companyId;
 	private Logger log = Logger.getLogger(UploadManager.class);
 	
 	Connection db = null;
+	
+	private String recordName;
+	
+	private String datatype;
+	private String studyID;
+	private String fileName;
+	private String treepath;
+	private int fileSize;
 	
 	@Override
 	public void run() {
@@ -86,7 +92,11 @@ public class UploadManager extends Thread{
 			if(db!=null){
 				dto.setStatus(Boolean.FALSE);
 				dto.setMessage(e.getMessage());
-				db.storeUploadStatus(dto);
+				try {
+					db.storeUploadStatus(dto);
+				} catch (DataStorageException e1) {
+					log.error("Error on update the upload status." + e1.getMessage());
+				}
 			}else{
 				e.printStackTrace();	
 			}
@@ -99,26 +109,21 @@ public class UploadManager extends Thread{
 		
 		companyId = ResourceUtility.getCurrentCompanyId();
 		
-		metaData.setFileName(fileName);
-		metaData.setStudyID(studyID);
-		metaData.setDatatype(datatype);
-		metaData.setSubjectID(recordName);
-		metaData.setRecordName(recordName);
+		this.fileName = fileName; //metaData.setFileName(fileName);
+		this.studyID = studyID; //metaData.setStudyID(studyID);
+		this.datatype = datatype; //metaData.setDatatype(datatype);
+		
+		this.recordName = recordName; //metaData.setRecordName(recordName);
 		
 		user = ResourceUtility.getCurrentUser();
 		
-		String userId = String.valueOf(user.getUserId());
-		if(userId == null || userId.equals("")){
-			userId = user.getEmailAddress();
-		}
-		metaData.setUserID(userId);
 		SniffedXmlInputStream xmlSniffer = null;
 		
 		try {
 			
 			boolean performConvesion = true;
 			
-			fileExtension = EnumFileExtension.valueOf(extension(metaData.getFileName()).toUpperCase());
+			fileExtension = FileExtension.valueOf(extension(this.fileName).toUpperCase());
 			
 			byte[] bytes = new byte[(int)fileSize];
 			fileToSave.read(bytes);
@@ -154,10 +159,10 @@ public class UploadManager extends Thread{
 				
 				if(xmlString.indexOf("restingecgdata") != -1) {						
 					if(xmlString.indexOf("<documentversion>1.03</documentversion>") != -1) {
-						fileType = EnumFileType.PHILIPS_103;
+						fileType = FileType.PHILIPS_103;
 					}
 					else if(xmlString.indexOf("<documentversion>1.04</documentversion>") != -1) {
-						fileType = EnumFileType.PHILIPS_104;
+						fileType = FileType.PHILIPS_104;
 					}
 					else {
 						throw new UploadFailureException("Unrecognized version number for Philips file");
@@ -165,9 +170,9 @@ public class UploadManager extends Thread{
 				
 				// indicates GE Muse 7
 				}else if(xmlString.indexOf("RestingECG") != -1) {
-					fileType = EnumFileType.MUSE_XML;
+					fileType = FileType.MUSE_XML;
 				}else{
-					fileType = EnumFileType.HL7;
+					fileType = FileType.HL7;
 				}
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
@@ -175,13 +180,13 @@ public class UploadManager extends Thread{
 				break;
 			case HEA:
 				
-				checkHeaFile(bytes, metaData.getRecordName(), fileSize);
+				checkHeaFile(bytes, recordName, fileSize);
 				
 				liferayFile = saveFile(fileSize, destFolder, bytes);
 				
 				performConvesion = this.checkWFDBFiles(liferayFile, fileExtension);
 				
-				fileType = EnumFileType.WFDB;
+				fileType = FileType.WFDB;
 				
 				break;
 				
@@ -193,7 +198,7 @@ public class UploadManager extends Thread{
 				
 				performConvesion = this.checkWFDBFiles(liferayFile, fileExtension);
 				
-				fileType = EnumFileType.WFDB;
+				fileType = FileType.WFDB;
 				
 				break;
 			default:
@@ -203,10 +208,10 @@ public class UploadManager extends Thread{
 			if(performConvesion){
 				validationTime = java.lang.System.currentTimeMillis() - validationTime;
 				dto = new UploadStatusDTO(null, null, null, validationTime, null, null, null);
-				dto.setRecordName(metaData.getSubjectID());
+				dto.setRecordName(recordName);
 			}else{
 				dto = new UploadStatusDTO(null, null, null, null, null, null, "Incomplete ECG, waiting files.");
-				dto.setRecordName(metaData.getSubjectID());
+				dto.setRecordName(recordName);
 			}
 			return dto;
 			
@@ -338,7 +343,7 @@ public class UploadManager extends Thread{
 
 	private FileEntry saveFile(long fileSize, Folder destFolder, byte[] bytes) throws UploadFailureException {
 		
-		Folder recordNameFolder = createRecordNameFolder(destFolder, metaData.getRecordName(), user.getUserId());
+		Folder recordNameFolder = createRecordNameFolder(destFolder, this.recordName, user.getUserId());
 		return  storeFile(bytes, fileSize, recordNameFolder, true);
 		
 	}
@@ -365,27 +370,30 @@ public class UploadManager extends Thread{
 				if(subFolders!=null){
 					for (Folder sub : subFolders) {
 						if(sub.getName().equals(recordName)){
-							return sub;
+							recordNameFolder = sub;
+							break;
 						}
 					}
 				}
 				
-				ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
-				try{
-					recordNameFolder = DLAppLocalServiceUtil.addFolder(userId, ResourceUtility.getCurrentGroupId(), folderId, recordName, "", service);
-				}catch (Exception e){
-					Thread.sleep(2000);
-					int tries = 5;
-					
-					for (int i = 0; i < tries && recordNameFolder == null; i++) {
-						try{
-							recordNameFolder = DLAppLocalServiceUtil.getFolder(folder.getRepositoryId(), folder.getFolderId(), recordName);
-						}catch (Exception e2){
-							Thread.sleep(2000);
-							log.warn("Sleep and Try Again. #"+(i));
+				if(recordNameFolder == null){
+					ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
+					try{
+						recordNameFolder = DLAppLocalServiceUtil.addFolder(userId, ResourceUtility.getCurrentGroupId(), folderId, recordName, "", service);
+					}catch (Exception e){
+						Thread.sleep(2000);
+						int tries = 5;
+						
+						for (int i = 0; i < tries && recordNameFolder == null; i++) {
+							try{
+								recordNameFolder = DLAppLocalServiceUtil.getFolder(folder.getRepositoryId(), folder.getFolderId(), recordName);
+							}catch (Exception e2){
+								Thread.sleep(2000);
+								log.warn("Sleep and Try Again. #"+(i));
+							}
 						}
+						
 					}
-					
 				}
 			}else{
 				recordNameFolder = folder;
@@ -394,7 +402,7 @@ public class UploadManager extends Thread{
 			if(recordNameFolder != null) {
 				StringBuilder treePath = new StringBuilder();
 				extractFolderHierachic(recordNameFolder, treePath);
-				metaData.setTreePath(treePath.toString());
+				this.treepath = treePath.toString(); //metaData.setTreePath(treePath.toString());
 			}else {
 				throw new UploadFailureException("Please select a folder");
 			}
@@ -413,7 +421,7 @@ public class UploadManager extends Thread{
 		return recordNameFolder;
 	}
 
-	private boolean checkWFDBFiles(FileEntry liferayFile, EnumFileExtension fileExtension) throws PortalException, SystemException {
+	private boolean checkWFDBFiles(FileEntry liferayFile, FileExtension fileExtension) throws PortalException, SystemException {
 		
 		boolean ret = false;
 		
@@ -421,12 +429,12 @@ public class UploadManager extends Thread{
 		List<FileEntry> subFiles = DLAppLocalServiceUtil.getFileEntries(ResourceUtility.getCurrentGroupId(), folderId);
 		if(subFiles != null){
 			for (FileEntry file : subFiles) {
-				if(EnumFileExtension.HEA.equals(fileExtension)){	
+				if(FileExtension.HEA.equals(fileExtension)){	
 					ret = file.getTitle().substring(0, file.getTitle().indexOf('.')).equals(liferayFile.getTitle().substring(0, file.getTitle().indexOf('.'))) && 
-							EnumFileExtension.DAT.toString().equalsIgnoreCase(file.getExtension());
-				}else if(EnumFileExtension.DAT.equals(fileExtension)){
+							FileExtension.DAT.toString().equalsIgnoreCase(file.getExtension());
+				}else if(FileExtension.DAT.equals(fileExtension)){
 					ret = file.getTitle().substring(0, file.getTitle().indexOf('.')).equals(liferayFile.getTitle().substring(0, file.getTitle().indexOf('.'))) && 
-							EnumFileExtension.HEA.toString().equalsIgnoreCase(file.getExtension());
+							FileExtension.HEA.toString().equalsIgnoreCase(file.getExtension());
 				}
 				
 				if(ret){
@@ -459,14 +467,14 @@ public class UploadManager extends Thread{
 		}
 
 		int fileSizeInt = (int) fileSize;
-		metaData.setFileSize(fileSizeInt);
+		this.fileSize = fileSizeInt; //metaData.setFileSize(fileSizeInt);
 		FileEntry file = null;
 		
 		try {
 			
 			//TODO [VILARDO] DEFINE THE FILE TYPE
 			ServiceContext service = LiferayFacesContext.getInstance().getServiceContext();
-			file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), metaData.getFileName(), "", metaData.getFileName(), "", "1.0", bytes, service);
+			file = DLAppLocalServiceUtil.addFileEntry(user.getUserId(), ResourceUtility.getCurrentGroupId(), folder.getFolderId(), this.fileName, "", this.fileName, "", "1.0", bytes, service);
 			
 		} catch(DuplicateFileException e){
 			log.error(e.getMessage());
@@ -486,7 +494,11 @@ public class UploadManager extends Thread{
 		boolean correctFormat = true;
 		
 		initializeLiferayPermissionChecker(user.getUserId());
-		db = ConnectionFactory.createConnection();
+		try {
+			db = ConnectionFactory.createConnection();
+		} catch (DataStorageException e) {
+			throw new UploadFailureException("Failed to connect the database.", e);
+		}
 
 		switch (fileType) {
 			case WFDB:			method = "wfdbToRDT"; 			break;
@@ -497,7 +509,7 @@ public class UploadManager extends Thread{
 			default:	
 				switch (fileExtension) {
 					case RDT:	method = "rdtToWFDB16";					break;
-					case XYZ:	method = "wfdbToRDT"; 		fileType = EnumFileType.WFDB;		break;
+					case XYZ:	method = "wfdbToRDT"; 		fileType = FileType.WFDB;		break;
 					case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ break;
 					case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
 					case CSV:	method = "xyFile";						break;
@@ -509,12 +521,10 @@ public class UploadManager extends Thread{
 		}
 		
 		if(fileType != null){
-			metaData.setFileFormat(fileType.ordinal());
-		
-			if(EnumFileExtension.HEA.equals(fileExtension) || EnumFileExtension.DAT.equals(fileExtension)) {
+			if(FileExtension.HEA.equals(fileExtension) || FileExtension.DAT.equals(fileExtension)) {
 				
 				FileEntry headerFile = liferayFile;
-				if(EnumFileExtension.DAT.equals(fileExtension)){
+				if(FileExtension.DAT.equals(fileExtension)){
 					headerFile = wfdbPairFile;
 				}
 				// Parse the locally held header file
@@ -536,15 +546,15 @@ public class UploadManager extends Thread{
 			
 				LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
 			
-				parameterMap.put("userid", String.valueOf(user.getUserId()));
-				parameterMap.put("subjectid", 	metaData.getSubjectID());
+				parameterMap.put("userid", 		String.valueOf(user.getUserId()));
+				parameterMap.put("subjectid", 	this.recordName);
 				parameterMap.put("filename", 	liferayFile.getTitle());
-				parameterMap.put("studyID", 	metaData.getStudyID());
-				parameterMap.put("datatype", 	metaData.getDatatype());
-				parameterMap.put("treePath", 	metaData.getTreePath());
-				parameterMap.put("recordName", 	metaData.getRecordName());
-				parameterMap.put("fileSize", 	String.valueOf(metaData.getFileSize()));
-				parameterMap.put("fileFormat", 	String.valueOf(metaData.getFileFormat()));
+				parameterMap.put("studyID", 	this.studyID);
+				parameterMap.put("datatype", 	this.datatype);
+				parameterMap.put("treePath", 	this.treepath);
+				parameterMap.put("recordName", 	this.recordName);
+				parameterMap.put("fileSize", 	String.valueOf(this.fileSize));
+				parameterMap.put("fileFormat", 	String.valueOf(fileType.ordinal()));
 				
 				parameterMap.put("verbose", 	String.valueOf(false));
 				parameterMap.put("service", 	"DataConversion");
@@ -596,7 +606,11 @@ public class UploadManager extends Thread{
 						dto.setDocumentRecordId(docId);
 						dto.setTransferReadTime(conversionTime);
 						
-						db.storeUploadStatus(dto);
+						try {
+							db.storeUploadStatus(dto);
+						} catch (DataStorageException e) {
+							throw new UploadFailureException("Unable to persist the upload status.", e);		
+						}
 						
 						return dto;
 						
@@ -668,7 +682,7 @@ public class UploadManager extends Thread{
 		    	String[] firstField = words[0].split("/");
 		    	if(firstField != null && firstField.length>0) {
 		    		// validate the record name here against the record name in the metadata
-		    		if(!(firstField[0].equals(metaData.getRecordName()))) {
+		    		if(!(firstField[0].equals(this.recordName))) {
 		    			br.close();
 		    			return false;
 		    		}
@@ -680,7 +694,7 @@ public class UploadManager extends Thread{
 		    	
 		    	// Step 2:  Get the number of leads
 		    	int numLeads = Integer.parseInt(words[1]);
-		    	metaData.setChannels(numLeads);
+//		    	metaData.setChannels(numLeads);
 		    	
 		    	// Step 3:  If there is a third section, parse it out.  The sampling frequency will be the first value that 
 		    	//          is extracted from it.  If it is not present, the default is 250 (already set in metadata class)
@@ -688,7 +702,7 @@ public class UploadManager extends Thread{
 			    	String[] thirdField = words[2].split("/");
 			    	if(thirdField != null && thirdField.length>0) {
 			    		float sampFreq = Float.parseFloat(thirdField[0]);
-			    		metaData.setSampFrequency(sampFreq);
+//			    		metaData.setSampFrequency(sampFreq);
 			    	}
 		    		
 		    		// Step 4:  If there is a fourth field, then that is the number of samples per signal
@@ -698,7 +712,7 @@ public class UploadManager extends Thread{
 		    			
 		    			// if zero, then ignore
 		    			if(numPoints>0) {
-		    				metaData.setNumberOfPoints(numPoints);
+//		    				metaData.setNumberOfPoints(numPoints);
 		    			}
 		    		}		
 		    	}

@@ -40,9 +40,10 @@ import org.primefaces.event.NodeSelectEvent;
 
 import com.liferay.portal.model.User;
 
-import edu.jhu.cvrg.dbapi.dto.UploadStatusDTO;
-import edu.jhu.cvrg.dbapi.enums.EnumUploadState;
-import edu.jhu.cvrg.dbapi.factory.ConnectionFactory;
+import edu.jhu.cvrg.data.dto.UploadStatusDTO;
+import edu.jhu.cvrg.data.enums.UploadState;
+import edu.jhu.cvrg.data.factory.ConnectionFactory;
+import edu.jhu.cvrg.data.util.DataStorageException;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.main.UploadManager;
 import edu.jhu.cvrg.waveform.model.FileTreeNode;
@@ -212,7 +213,12 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			}
         }
         if(listenIds != null && !listenIds.isEmpty()){
-        	List<UploadStatusDTO> tmpBackgroundQueue = ConnectionFactory.createConnection().getUploadStatusByUserAndDocId(userModel.getUserId(), listenIds);
+        	List<UploadStatusDTO> tmpBackgroundQueue = null;
+			try {
+				tmpBackgroundQueue = ConnectionFactory.createConnection().getUploadStatusByUserAndDocId(userModel.getUserId(), listenIds);
+			} catch (DataStorageException e) {
+				this.getLog().error("Error on load the background upload queue. " + e.getMessage());
+			}
         	if(tmpBackgroundQueue != null){
 		        for (UploadStatusDTO s : tmpBackgroundQueue) {
 					if(backgroundQueue.contains(s)){
@@ -227,7 +233,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
         if(backgroundQueue != null){
         	boolean stopListening = false;
         	for (UploadStatusDTO u : backgroundQueue) {
-        		stopListening = (EnumUploadState.DONE.equals(u.getState()) || EnumUploadState.ERROR.equals(u.getState()) );
+        		stopListening = (UploadState.DONE.equals(u.getState()) || UploadState.ERROR.equals(u.getState()) );
         		if(!stopListening){
         			break;
         		}
@@ -256,8 +262,8 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			int index = this.getBackgroundQueue().indexOf(dto);
 			if(index != -1){
 				UploadStatusDTO older = this.getBackgroundQueue().get(index);
-				if(EnumUploadState.WAIT.equals(older.getState()) || 
-				   EnumUploadState.ERROR.equals(older.getState())){
+				if(UploadState.WAIT.equals(older.getState()) || 
+				   UploadState.ERROR.equals(older.getState())){
 					this.getBackgroundQueue().remove(index);	
 				}
 			}
@@ -295,7 +301,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			
 			List<UploadStatusDTO> toRemove = new ArrayList<UploadStatusDTO>();
 			for (UploadStatusDTO dto : backgroundQueue) {
-				if(EnumUploadState.DONE.equals(dto.getState())){
+				if(UploadState.DONE.equals(dto.getState())){
 					toRemove.add(dto);
 				}
 			}
