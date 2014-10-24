@@ -75,7 +75,7 @@
 	
     function stopListening() {
     	if(progressTimer != null){
-    		clearInterval(progressTimer);	
+    		clearInterval(progressTimer);
     		progressTimer = null;
     	}
         onComplete();

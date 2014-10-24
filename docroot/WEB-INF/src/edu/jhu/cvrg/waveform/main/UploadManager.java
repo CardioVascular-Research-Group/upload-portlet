@@ -59,6 +59,8 @@ import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 
+import org.apache.commons.io.input.XmlStreamReader;
+
 public class UploadManager extends Thread{
 
 	private User user;
@@ -118,6 +120,7 @@ public class UploadManager extends Thread{
 		user = ResourceUtility.getCurrentUser();
 		
 		SniffedXmlInputStream xmlSniffer = null;
+		XmlStreamReader xmlDecoder = null;
 		
 		try {
 			
@@ -130,26 +133,26 @@ public class UploadManager extends Thread{
 			
 			switch (fileExtension) {
 			case XML:
-				xmlSniffer = new SniffedXmlInputStream(fileToSave);
 				
+				xmlSniffer = new SniffedXmlInputStream(fileToSave);	
 				String encoding = xmlSniffer.getXmlEncoding();
 				
 				StringBuilder xmlString = new StringBuilder(new String(bytes, encoding));
 				
-				/*xmlString.append(new String(bytes));
-				
 				// check for the first xml tag
-				// if it does not exist, remake the file using UTF-16 
-				// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
-				if(xmlString.indexOf("xml") == -1) {
-					// TODO:  In the future, use a library to check for the encoding that the stream uses
-					xmlString = new StringBuilder(new String(bytes, "UTF-16"));
-					
-					if(xmlString.indexOf("xml") == -1) {
-						throw new UploadFailureException("Unexpected file.");
-					}
-					
-				}*/
+ 				// if it does not exist, remake the file using UTF-16
+				// This section is done primarily in the case of Philips files, since their encoding is listed
+				// as "utf-16" instead of "UTF-16"
+				
+				// This may need to be revisited in the future if other formatting issues like this crop up
+ 				if(xmlString.indexOf("xml") == -1) {
+ 					xmlString = new StringBuilder(new String(bytes, "UTF-16"));
+ 					
+ 					if(xmlString.indexOf("xml") == -1) {
+ 						throw new UploadFailureException("Unexpected file.");
+ 					}
+ 					
+				}
 				
 				// indicates one of the Philips formats
 				
@@ -171,6 +174,11 @@ public class UploadManager extends Thread{
 				// indicates GE Muse 7
 				}else if(xmlString.indexOf("RestingECG") != -1) {
 					fileType = FileType.MUSE_XML;
+				
+				// indicates Schiller 
+				}else if(xmlString.indexOf("examdescript") != -1) {
+					fileType = FileType.SCHILLER;
+				
 				}else{
 					fileType = FileType.HL7;
 				}
@@ -222,6 +230,9 @@ public class UploadManager extends Thread{
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
 		}finally{
 			try {
+				if(xmlDecoder != null) {
+					xmlDecoder.close();
+				}
 				if(xmlSniffer != null) {
 					xmlSniffer.close();
 				}
@@ -505,13 +516,14 @@ public class UploadManager extends Thread{
 			case HL7:			method = "hL7";					break;
 			case PHILIPS_103:	method = "philips103ToWFDB";	break;
 			case PHILIPS_104:	method = "philips104ToWFDB";	break;
+			case SCHILLER:	    method = "SCHILLERToWFDB";   	break;
 			case MUSE_XML:		method = "museXML";				break;
 			default:	
 				switch (fileExtension) {
 					case RDT:	method = "rdtToWFDB16";					break;
 					case XYZ:	method = "wfdbToRDT"; 		fileType = FileType.WFDB;		break;
 					case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ break;
-					case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/* will eventually process GE MUSE Text files*/	break;
+					case TXT:	method = evaluateTextFile(liferayFile.getTitle());	/*currently a stub method -  will eventually process GE MUSE Text files*/	break;
 					case CSV:	method = "xyFile";						break;
 					case NAT:	method = "na";							break;
 					case GTM:	method = "na";							break;
@@ -580,7 +592,7 @@ public class UploadManager extends Thread{
 				}
 				
 	
-				log.info("Calling Web Service.");
+				log.info("Calling Web Service with " + liferayFile.getTitle() + ".");
 				
 				long conversionTime = java.lang.System.currentTimeMillis();
 				
@@ -753,7 +765,7 @@ public class UploadManager extends Thread{
 	        PermissionChecker permissionChecker = PermissionCheckerFactoryUtil.create(user);
 	        PermissionThreadLocal.setPermissionChecker(permissionChecker);
 		}catch (Exception e){
-			throw new UploadFailureException("Fail on premission checker initialization. [userId="+userId+"]", e);
+			throw new UploadFailureException("Fail on permission checker initialization. [userId="+userId+"]", e);
 		}
 		
 	}
