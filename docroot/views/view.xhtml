@@ -10,62 +10,133 @@
 	<h:head />
 	<h:body>
 
-	<h:panelGroup layout="block" id="uploadTopContentLineShade" styleClass="topLineShade"> 
-   		<h:outputText styleClass="TitleLine" value="ICM Electrocardiograph Tool Kit: Upload" />
-   	</h:panelGroup>
+	<h:form id="formUpload" enctype="multipart/form-data">
+		
+		<h:panelGroup rendered="#{fileUploadBacking.user != null}">
+			<p:layout id="layoutUpload" style="width:100%;height:500px" >
+		 		<p:layoutUnit styleClass="westpanel" position="west" header="Select or Create Upload Folder" resizable="true" size="350" minSize="350" maxSize="600">
+		 			    
+		 			    <div class="nav">
+		                    <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
+		                    <p:commandButton  id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
+		                    <p:growl id="deletemessage" showDetail="true"/>
+		                    <p:commandButton  id="btnDelete" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.deleteFolder}" value="Delete Folder" update="fileTree">
+		                    	<p:confirm header="Delete Confirmation" message="Are you sure?" icon="ui-icon-alert"/>
+		                    </p:commandButton>
+		                    
+		                    <p:confirmDialog global="true" showEffect="fade" hideEffect="explode">
+        						<p:commandButton value="Yes" type="button" styleClass="ui-confirmdialog-yes" icon="ui-icon-check" />
+        						<p:commandButton value="No" type="button" styleClass="ui-confirmdialog-no" icon="ui-icon-close" />
+    						</p:confirmDialog>
+		                </div>              
+
+						<p:tree id="fileTree" 
+							styleClass="waveformTree"
+							dynamic="true"
+							selection="#{fileUploadBacking.fileTree.selectedNode}"
+							selectionMode="single"
+							value="#{fileUploadBacking.fileTree.treeRoot}" 
+							var="node">
+							
+							<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" update="fileTree"/>
+							
+							<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
+								<h:outputText value="#{node}" />
+							</p:treeNode>
+							
+							<p:treeNode type="document" icon="ui-icon ui-icon-note">
+								<h:outputText value="#{node}"/>
+							</p:treeNode>
+							
+							<p:treeNode type="analysis" icon="ui-icon ui-icon-document">
+								<h:outputText value="#{node}"/>
+							</p:treeNode>
+							
+							<p:treeNode type="document_error" icon="ui-icon ui-icon-alert">
+								<h:outputText value="#{node}"/>
+							</p:treeNode>
+						</p:tree>
+
+						<h:panelGroup layout="block">
+							<h3 class="ui-widget ui-widget-header ui-corner-all submenu-title" style="padding:5px 6px;">Upload Instructions</h3>
+							<ol>
+								<li>Select a folder from the tree on the left.</li>
+								<li>If the desired folder does not exist, create it then select.</li>
+								<li>Select file(s) using the "Choose" button on the right.</li>
+								<li>Click the "Upload All" button on the right.</li>
+							</ol>
+						</h:panelGroup>
+		    	</p:layoutUnit>
+		    	
+		    	<p:layoutUnit position="center" header="Select files from your computer to upload and save" >
+			    	
+			    	<p:fileUpload id="uploader"
+			                      	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
+			                      	value="Facts" 
+			      	                multiple="true"
+			    	                uploadLabel="Upload All"
+			          	            cancelLabel="Remove All" 
+			          	            auto="false"
+			              	        widgetVar="waveformFileUpload"
+			                  	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
+			                      	description="Select Images" 
+			                      	onstart="startListening();"/>
+			    </p:layoutUnit>
+			    
+			    
+			    <p:layoutUnit position="east" collapsible="true" header="Background Queue" resizable="true" collapsed="#{!fileUploadBacking.showBackgroundPanel}" minSize="400" >
+			    
+					<p:remoteCommand name="onComplete" action="#{fileUploadBacking.onComplete}" update="fileTree"/>
+			    	<p:remoteCommand name="loadBackgroundQueue" action="#{fileUploadBacking.loadBackgroundQueue}" update="divBackgroundQueuePanel"/>
+			    
+			    	<h:panelGroup layout="block" id="divBackgroundQueuePanel">
+			    	
+			    		<h:panelGroup layout="block" rendered="#{fileUploadBacking.summary != null}" id="summary" styleClass="summary">
+				    		<span>#{fileUploadBacking.summary}</span>
+					    	<p:commandLink styleClass="ui-icon ui-icon-close remove" oncomplete="removeAll();" update="backgroundQueue" actionListener="#{fileUploadBacking.removeAllDoneItem}"/>
+				    	</h:panelGroup>
+			    	
+				    	<p:dataTable id="backgroundQueue"
+								var="item"
+								rowIndexVar="index"
+								value="#{fileUploadBacking.backgroundQueue}"
+								style="width:100%"
+								emptyMessage="No background process."
+								>
+				    	
+				    		<p:column headerText="Subject" width="39%" styleClass="recordName">
+				    			<span><h:outputText value="#{item.recordName}" /></span>
+							</p:column>
+							
+							<p:column headerText="Progress" width="35%">
+								<progress value="#{item.progress}" max="100"></progress>
+							</p:column>
+							
+							<p:column headerText="Phase" width="26%" styleClass="queuePhaseColumn">
+								<span title="#{item.message != null ? item.message : ''}" class="#{item.message != null ? 'error' : ''}"><h:outputText value="#{item.state}" /></span>
+								<p:commandLink styleClass="ui-icon ui-icon-close" update="backgroundQueue" actionListener="#{fileUploadBacking.removeTableItem}" rendered="#{item.progress == 100}">
+									<f:param name="index" value="#{index}"/>
+								</p:commandLink>
+							</p:column>
+						</p:dataTable>
+			    	
+			    	</h:panelGroup>
+			    
+			    	
+			    
+			    </p:layoutUnit>
+			</p:layout>
+			<script>
+				startListening(true);
+			</script>
+		</h:panelGroup>
+		
+		<h:panelGroup rendered="#{fileUploadBacking.user == null}">
+			<div class="signin">
+				Please <a href="/c/portal/login" rel="nofollow">Sign In</a>
+			</div>
+		</h:panelGroup>
+	</h:form>
 	
-	<f:event type="preRenderView" listener="#{fileUploadBacking.init}" />
-	
-	<h:panelGroup layout="block" styleClass="backgroundofContent">
- 		<p:layout style=" height:550px; top:20px;" id="layoutUpload">
-			<p:layoutUnit position="center" styleClass="layout-main">
-				<h:form id="formUpload" enctype="multipart/form-data" style="height:555">
-    				
-    				<p:panel id="panel" header="Select Folder to Upload Files Into" styleClass="tree-panel">
-                              
-                        <p:panelGrid id="buttonGrid" columns="3" style="border:0;" >
-                            <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
-                            <p:commandButton style=" font-family: helvetica;font-size:8pt;" id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
-                        </p:panelGrid>              
-
-   							<p:tree id="fileTree" 
-								selection="#{fileUploadBacking.fileTree.selectedNode}"
-								selectionMode="single"
-								value="#{fileUploadBacking.fileTree.treeRoot}" 
-								var="node">
-								
-								<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" update="fileTree"/>
-								
-
-								<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
-									<h:outputText value="#{node.subjectID}" />
-								</p:treeNode>
-								
-								<p:treeNode type="document" icon="ui-icon ui-icon-document">
-									<h:outputText value="#{node.subjectID}"/>
-								</p:treeNode>
-							</p:tree>
-					</p:panel> 
-      
-					<p:panel id="fileUploadPanel" header="Select files form your computer to upload and save" styleClass="upload-panel">    
-                    
-                   		<p:fileUpload id="uploader" style="float:right; width:100%!important;"
-                        	allowTypes="/(\.|\/)(hea|dat|xyz|xml)$/"
-        	                value="Facts" 
-        	                multiple="true"
-      	                  	uploadLabel="Upload All"
-            	            cancelLabel="Remove All" 
-            	            auto="false"
-                	        widgetVar="waveformFileUpload"
-                    	    fileUploadListener="#{fileUploadBacking.handleFileUpload}"
-                        	description="Select Images" 
-                        	update="fileTree"/>          
-                 	</p:panel>  
-       			</h:form>
-          </p:layoutUnit>
-		</p:layout>
-</h:panelGroup>
-
-
 	</h:body>
 </f:view>
