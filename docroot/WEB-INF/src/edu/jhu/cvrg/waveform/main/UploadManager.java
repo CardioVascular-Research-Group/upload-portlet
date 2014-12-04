@@ -1,760 +1,1173 @@
 package edu.jhu.cvrg.waveform.main;
+
 /*
+
 Copyright 2013 Johns Hopkins University Institute for Computational Medicine
 
+
+
 Licensed under the Apache License, Version 2.0 (the "License");
+
 you may not use this file except in compliance with the License.
+
 You may obtain a copy of the License at
+
+
 
 http://www.apache.org/licenses/LICENSE-2.0
 
+
+
 Unless required by applicable law or agreed to in writing, software
+
 distributed under the License is distributed on an "AS IS" BASIS,
+
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
 See the License for the specific language governing permissions and
+
 limitations under the License.
+
 */
+
 /**
-* @author Chris Jurado, Mike Shipway, Brandon Benitez
+
+* @author Chris Jurado, Mike Shipway, Brandon Benitez, Andre Vilardo
+
 * 
+
 */
+
 
 
 import java.io.BufferedReader;
+
 import java.io.ByteArrayInputStream;
+
 import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
+
 import java.io.IOException;
+
 import java.io.InputStream;
+
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.Reader;
-import java.io.StringReader;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+
+import java.io.UnsupportedEncodingException;
+
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
+
 import java.util.List;
-import java.util.Random;
-import java.util.Scanner;
 
-import javax.xml.bind.JAXBException;
+import java.util.UUID;
 
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
-import org.sierraecg.SierraEcgFiles;
-import org.sierraecg.schema.Signalcharacteristics;
+
+
+import javax.faces.context.FacesContext;
+
+import javax.portlet.PortletSession;
+
+
+
+import org.apache.log4j.Logger;
+
+
+
+import com.liferay.portal.kernel.exception.PortalException;
+
+import com.liferay.portal.kernel.exception.SystemException;
 
 import com.liferay.portal.model.User;
 
+import com.liferay.portal.security.auth.PrincipalThreadLocal;
+
+import com.liferay.portal.security.permission.PermissionChecker;
+
+import com.liferay.portal.security.permission.PermissionCheckerFactoryUtil;
+
+import com.liferay.portal.security.permission.PermissionThreadLocal;
+
+import com.liferay.portal.service.UserLocalServiceUtil;
+
+
+
+import edu.jhu.cvrg.data.dto.UploadStatusDTO;
+
+import edu.jhu.cvrg.data.factory.Connection;
+
+import edu.jhu.cvrg.data.util.DataStorageException;
+
+import edu.jhu.cvrg.filestore.enums.EnumFileExtension;
+
+import edu.jhu.cvrg.filestore.enums.EnumFileType;
+
+import edu.jhu.cvrg.filestore.enums.EnumUploadState;
+
+import edu.jhu.cvrg.filestore.main.FileStoreFactory;
+
+import edu.jhu.cvrg.filestore.main.FileStorer;
+
+import edu.jhu.cvrg.filestore.model.ECGFile;
+
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
-import edu.jhu.cvrg.waveform.model.AnnotationData;
-import edu.jhu.cvrg.waveform.model.StudyEntry;
-import edu.jhu.cvrg.waveform.utility.AnnotationUtility;
-import edu.jhu.cvrg.waveform.utility.EnumFileType;
-import edu.jhu.cvrg.waveform.utility.FTPUtility;
-import edu.jhu.cvrg.waveform.utility.MetaContainer;
+
+import edu.jhu.cvrg.waveform.model.LocalFileTree;
+
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
-import edu.jhu.cvrg.waveform.utility.UploadUtility;
-import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
-// This is for Philips 1.03 format
-// This is for Philips 1.04 format
 
-public class UploadManager {
 
-	private char name_separator = (char) 95;
 
-	private MetaContainer metaData = new MetaContainer();
-	private String tempHeaderFile = "";
-	private User user;
-	EnumFileType fileType;
-	Document xmlJdom;
+public class UploadManager extends Thread{
+
 	
-	long overallStartTime;
-	long fileLoadStartTime;
-	long ftpStartTime;
-	long conversionStartTime;
-	long annotationStartTime;
-	long overallEndTime;
-	long intermediateEndTime;
-	
-	long fileLoadTimeElapsed;
-	long ftpTimeElapsed;
-	long conversionTimeElapsed;
-	long annotationTimeElapsed;
-	long overallTimeElapsed;
-	
-	// For Philips 1.03 format
-	org.sierraecg.schema.Restingecgdata philipsECG103;
-	org.sierraecg.DecodedLead[] leadData103;
-	
-	// For Philips 1.04 format
-	org.cvrgrid.philips.jaxb.beans.Restingecgdata philipsECG104;
-	org.cvrgrid.philips.DecodedLead[] leadData104;
- 
-	public void processUploadedFile(InputStream fileToSave, String fileName, long fileSize, String studyID, String datatype, String virtualPath) throws UploadFailureException {
 
-		overallStartTime = java.lang.System.currentTimeMillis();
-		
-		metaData.setFileName(fileName);
-		metaData.setStudyID(studyID);
-		metaData.setDatatype(datatype);
-		if(virtualPath != null) {
-			metaData.setTreePath(virtualPath);
-		}
-		else {
-			throw new UploadFailureException("Please select a folder");
-		}
+	private LocalFileTree fileTree;
 
-		user = ResourceUtility.getCurrentUser();
+	private Long validationTime; 
 
-		try {
-			fileLoadStartTime = java.lang.System.currentTimeMillis();
-		
-				fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
-				
-				File tempFile =	saveFileToTemp(fileToSave, fileSize);
-				
-				if(fileType == EnumFileType.XML) {
-					String xmlString = "";
-					
-					BufferedReader xmlBuf = new BufferedReader(new FileReader(tempFile));
-					String line = xmlBuf.readLine();
-					
-					while(line != null) {			
-						if(!(line.contains("!DOCTYPE"))) {
-							xmlString = xmlString + line;
-						}
-						line = xmlBuf.readLine();
-					}
-					
-					xmlBuf.close();
-					
-					// check for the first xml tag
-					// if it does not exist, remake the file using UTF-16 
-					// UTF-16 is known not to work with the input stream passed in, and saves the raw bytes
-					if(!(xmlString.contains("xml"))) {
-						// TODO:  In the future, use a library to check for the encoding that the stream uses
-						FileInputStream tempFis = new FileInputStream(tempFile);
-						xmlString = convertStreamToString(tempFis, "UTF-16");
-						tempFis.close();
-						tempFile.delete();
-						
-						fileToSave = new ByteArrayInputStream(xmlString.getBytes("UTF-16"));
-						tempFile = saveFileToTemp(fileToSave, fileSize);
-						
-					}
-					
-					
-					// indicates one of the Philips formats
-					
-					// JDOM seems to be having problems building the XML structure for Philips 1.03,
-					// Checking for the elements directly in the string is required to get the right version
-					// and also takes less memory
-					if(xmlString.contains("restingecgdata")) {						
-						if(xmlString.contains("<documentversion>1.03</documentversion>")) {
-							fileType = EnumFileType.PHIL103;
-							extractPhilips103Data(tempFile);
-						}
-						else if(xmlString.contains("<documentversion>1.04</documentversion>")) {
-							fileType = EnumFileType.PHIL104;
-							extractPhilips104Data(tempFile);
-						}
-						else {
-							throw new UploadFailureException("Unrecognized version number for Philips file");
-						}
-							
-							//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
-							// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
-							
-					}
-					// indicates GE Muse 7
-					else if(xmlString.contains("RestingECG")) {
-						//TODO:  Insert the call to the method which strips any identifiable information if it is a Philips XML
-						// Make sure to convert the resulting String back to an InputStream so it can be fed to the saveFileToTemp method
-						xmlJdom = build(xmlString);
-						fileType = EnumFileType.MUSEXML;
-						extractMuseXMLData();
-					}						
-					
-				}
-				
-				String userId = user.getScreenName();
-				if(userId == null || userId.equals("")){
-					userId = user.getEmailAddress();
-				}
-				metaData.setUserID(userId);
-				
-				intermediateEndTime = java.lang.System.currentTimeMillis();
-				
-				fileLoadTimeElapsed = intermediateEndTime - fileLoadStartTime;
-				
-				String outputDirectory = uploadFileFtp(userId, tempFile);
+	private EnumFileExtension fileExtension;
+
+	private UploadStatusDTO uploadStatusDTO;
+
+	private Logger log = Logger.getLogger(UploadManager.class);
+
+	private Connection db = null;
+
 	
-				convertUploadedFile(outputDirectory, userId, false);
 
-			} catch (Exception e) {
-				e.printStackTrace();
-				throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage());
-			}	
-		
-		overallEndTime = java.lang.System.currentTimeMillis();
-		
-		overallTimeElapsed = overallEndTime - overallStartTime;
-		
-		System.out.println("The overall runtime = " + overallTimeElapsed + " milliseconds");
-		System.out.println("The runtime for preparing the file for upload = " + fileLoadTimeElapsed + " milliseconds");
-		System.out.println("The runtime for uploading the file = " + ftpTimeElapsed + " milliseconds");
-		System.out.println("The runtime for converting the data and entering it into the database is = " + conversionTimeElapsed + " milliseconds");
-		System.out.println("The runtime for adding annotations (Philips only) = " + annotationTimeElapsed + " milliseconds");
+	public UploadManager(LocalFileTree fileTree){
+
+		this.fileTree = fileTree;
 
 	}
 
-	private File saveFileToTemp(InputStream fileToSave, long fileSize) {
+	
 
-		if (fileSize < Integer.MIN_VALUE || fileSize > Integer.MAX_VALUE) {
-			throw new IllegalArgumentException(fileSize	+ " cannot be cast to int without changing its value.");
-		}
-		
-		int fileSizeInt = (int) fileSize;
-		metaData.setFileSize(fileSizeInt);
+	@Override
+
+	public void run() {
+
+
 
 		try {
-			File targetFile = new File(ResourceUtility.getStagingFolder() + metaData.getFileName());
-			OutputStream fOutStream = new FileOutputStream(targetFile);
 
-			int read = 0;
-			byte[] bytes = new byte[1024];
+			convertUploadedFile();
 
-			while ((read = fileToSave.read(bytes)) != -1) {
-				fOutStream.write(bytes, 0, read);
+		} catch (Exception e) {
+
+			if(db!=null){
+
+				uploadStatusDTO.setStatus(Boolean.FALSE);
+
+				uploadStatusDTO.setMessage(e.getMessage());
+
+				try {
+
+					db.storeUploadStatus(uploadStatusDTO);
+
+				} catch (DataStorageException e1) {
+
+					log.error("Exception is:", e1);
+
+				}
+
+			}else{
+
+				log.error("Exception is:", e);	
+
 			}
 
-			fileToSave.close();
-			fOutStream.flush();
-			fOutStream.close();
+		}
 
-			int location = metaData.getFileName().indexOf(".");
+	}
 
-			if (location != -1) {
-				metaData.setSubjectID(metaData.getFileName().substring(0, location));
-			} else {
-				metaData.setSubjectID(metaData.getFileName());
-			}
+
+
+	public UploadStatusDTO storeUploadedFile(ECGFile ecgFile, UUID folderUuid) throws UploadFailureException {
+
+		
+
+		validationTime = java.lang.System.currentTimeMillis();
+
+		fileExtension = EnumFileExtension.valueOf(extension(ecgFile.getFileName()).toUpperCase());
+
+
+
+//		companyId = ResourceUtility.getCurrentCompanyId();
+
+		boolean WFDBComplete = true;
+
+		String message = "";
+
+		boolean performConvesion = true;
+
+
+
+		if (fileExtension == EnumFileExtension.XML) {
+
+			log.info("Processing XML file.");
+
+			processXMLFileExtension(ecgFile, folderUuid);
+
+		}
+
+
+
+		if (fileExtension == EnumFileExtension.HEA) {
+
+			log.info("Checking HEA file.");
+
+			checkHeaFile(ecgFile);
+
+		}
+
+
+
+		if (fileExtension == EnumFileExtension.DAT) {
+
+			log.info("Checking DAT file.");
+
+			checkDatFile(ecgFile);
+
+		}
+
+
+
+		if (fileExtension == EnumFileExtension.HEA || fileExtension == EnumFileExtension.DAT) {
+
 			
-			return targetFile;
+
+			ecgFile.setFileType(EnumFileType.WFDB);
+
+			saveFile(ecgFile, folderUuid);
+
+
+
+			try {
+
+				performConvesion = checkWFDBFiles(ecgFile, fileExtension, folderUuid);
+
+			} catch (PortalException e) {
+
+				log.error("Exception is:", e);
+
+			} catch (SystemException e) {
+
+				log.error("Exception is:", e);
+
+			}
+
+
+
+			WFDBComplete = findWFDBMatch(ecgFile, fileTree.findNameByUuid(folderUuid));
+
+		}
+
+
+
+		if (WFDBComplete) {
+
+			validationTime = java.lang.System.currentTimeMillis() - validationTime;
+
+		} else {
+
+			validationTime = null;
+
+			message = "Incomplete ECG, waiting files.";
+
+		}
+
+
+
+		uploadStatusDTO = new UploadStatusDTO(null, null, null, validationTime,	null, null, message);
+
+		uploadStatusDTO.setRecordName(ecgFile.getSubjectID());
+
+
+
+		return uploadStatusDTO;
+
+	}
+
+	
+
+	private void processXMLFileExtension(ECGFile ecgFile, UUID folderUuid){
+
+			
+
+		try {
+
+			SniffedXmlInputStream xmlSniffer = new SniffedXmlInputStream(ecgFile.getEcgDataFileAsInputStream());
+
+			String encoding = xmlSniffer.getXmlEncoding();
+
+			StringBuilder xmlString = new StringBuilder(new String(ecgFile.getEcgDataFileAsBytes(), encoding));
+
+
+
+		if(xmlString.indexOf("restingecgdata") != -1) {						
+
+			if(xmlString.indexOf("<documentversion>1.03</documentversion>") != -1) {
+
+				
+
+				ecgFile.setFileType(EnumFileType.PHILIPS_103);
+
+			}
+
+			else if(xmlString.indexOf("<documentversion>1.04</documentversion>") != -1) {
+
+				ecgFile.setFileType(EnumFileType.PHILIPS_104);
+
+			}
+
+			else {
+
+				if(xmlSniffer != null) {
+
+					xmlSniffer.close();
+
+				}
+
+
+
+				throw new UploadFailureException("Unrecognized version number for Philips file");
+
+			}
+
+		
+
+		// indicates GE Muse 7
+
+		}else if(xmlString.indexOf("RestingECG") != -1) {
+
+			ecgFile.setFileType(EnumFileType.MUSE_XML);
+
+		}else{
+
+			ecgFile.setFileType(EnumFileType.HL7);
+
+		}
+
+		
+
+		saveFile(ecgFile, folderUuid);
+
+
+
+			if(xmlSniffer != null) {
+
+				xmlSniffer.close();
+
+			}
+
+
 
 		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (Exception e) {
-			e.printStackTrace();
+
+			log.error("Exception is:", e);
+
+		} catch (UploadFailureException e) {
+
+			log.error("Exception is:", e);
+
 		}
+
+	}
+
+	
+
+	private boolean checkWFDBFiles(ECGFile ecgFile, EnumFileExtension fileExtension, UUID folderUuid) throws PortalException, SystemException {
+
 		
+
+		boolean ret = false;
+
+		
+
+		if(EnumFileExtension.HEA == fileExtension){
+
+			String fileNameToFind = extractRecordName(ecgFile.getFileName()) + ".dat";
+
+			ret = fileTree.fileExistsInFolder(fileNameToFind, folderUuid);
+
+		}
+
+		else{
+
+			String fileNameToFind = extractRecordName(ecgFile.getFileName()) + ".hea";
+
+			ret = fileTree.fileExistsInFolder(fileNameToFind, folderUuid);
+
+		}
+
+
+
+		return ret;
+
+	}
+
+
+
+	private void checkDatFile(ECGFile ecgFile) throws UploadFailureException {
+
+		byte[] fileBytes = ecgFile.getEcgDataFileAsBytes();
+
+		
+
+		boolean isBinary = false;
+
+		
+
+		int bytesToAnalyze = Double.valueOf(fileBytes.length * 0.3).intValue();
+
+		
+
+		int encodeErrorLimit = Double.valueOf(bytesToAnalyze * 0.2).intValue();
+
+		int encodeErrorCount = 0;
+
+		
+
+		for (int j = 0; j < bytesToAnalyze; j++) {
+
+			
+
+			int c = (int) fileBytes[j]; 
+
+			if(c == 9 || c == 10 || c == 13 || (c >= 32 && c <= 126) ){
+
+				isBinary = false;
+
+			} else {
+
+				isBinary = true;
+
+				if(encodeErrorCount == encodeErrorLimit ){
+
+					break;	
+
+				}else{
+
+					encodeErrorCount++;
+
+				}
+
+			}
+
+		}
+
+		
+
+		if (!isBinary) {
+
+			encodeErrorCount = 0;
+
+			
+
+			try {
+
+				String s = new String(fileBytes, "UTF-16");
+
+				for (int j = 0; j < s.length(); j++) {
+
+					
+
+					int c = (int) (s.charAt(j)); 
+
+					if(c == 9 || c == 10 || c == 13 || (c >= 32 && c <= 126) ){
+
+						isBinary =  false;
+
+					} else {
+
+						isBinary = true;
+
+						if(encodeErrorCount == encodeErrorLimit ){
+
+							break;	
+
+						}else{
+
+							encodeErrorCount++;
+
+						}
+
+					}
+
+				}
+
+			} catch (UnsupportedEncodingException e) {
+
+				isBinary = true;
+
+				log.error("Exception is:", e);
+
+			}
+
+		}
+
+		
+
+		if(!isBinary){
+
+			throw new UploadFailureException("Unexpected file.");
+
+		}
+
+	}
+
+
+
+	private void checkHeaFile(ECGFile ecgFile) throws UploadFailureException {
+
+		boolean valid = false;
+
+		StringBuilder line = new StringBuilder();
+
+		int lineNumber = 0;
+
+		int leadTotal = 0;
+
+		int leadOnFile = 0;
+
+		
+
+		for (int i = 0; i < ecgFile.getFileSize(); i++) {
+
+			
+
+			char s = (char)ecgFile.getEcgDataFileAsBytes()[i];
+
+			
+
+			line.append(s);
+
+			
+
+			if(s == '\n'){
+
+				
+
+				if(lineNumber > 0 && leadTotal == leadOnFile){
+
+					break;
+
+				}
+
+				
+
+				String[] headerInfo = line.toString().split(" ");
+
+				
+
+				valid = (headerInfo != null && headerInfo.length >= 2);
+
+				if(!valid) break;
+
+				
+
+				if(lineNumber == 0){
+
+					String fileRecordName = headerInfo[0];
+
+					int index = fileRecordName.lastIndexOf('/');
+
+					if(index != -1){
+
+						fileRecordName = fileRecordName.substring(0, index);
+
+					}
+
+					
+
+					valid = (ecgFile.getRecordName().equals(fileRecordName));
+
+					if(!valid) break;
+
+
+
+					leadTotal = Integer.valueOf(headerInfo[1]);
+
+					
+
+				}else if(lineNumber > 0 && valid){
+
+					leadOnFile++;
+
+				}
+
+				
+
+				line.delete(0, line.length()-1);
+
+				lineNumber++;
+
+			}
+
+		}
+
+		if(valid){
+
+			valid = leadTotal == leadOnFile;
+
+		}
+
+		
+
+		if(!valid){
+
+			throw new UploadFailureException("Unexpected file.");
+
+		}
+
+	}
+
+
+
+	private void saveFile(ECGFile ecgFile, UUID folderUuid) throws UploadFailureException {
+
+
+
+//		ecgFile.setTreePath(createRecordNameFolder(folderUuid, ecgFile.getRecordName(), ResourceUtility.getCurrentUserId()));
+
+//		storeFile(ecgFile, ecgFile.getFileSize(), fileTree.getFolderPath(folderUuid), true, ecgFile.getFileName());
+
+
+
+		String[] args = {String.valueOf(ResourceUtility.getCurrentGroupId()), String.valueOf(ResourceUtility.getCurrentUserId())};
+
+		FileStorer fileStorer = FileStoreFactory.returnFileStore(fileTree.getFileStoreType(), args);
+
+
+
+		fileStorer.storeFile(ecgFile, fileTree.getFolderPath(folderUuid), String.valueOf(ResourceUtility.getCurrentUserId()));
+
+	}
+
+	
+
+//	private synchronized void storeFile(ECGFile ecgFile, long fileSize, String folderPath, boolean twice, String fileName) throws UploadFailureException {
+
+//
+
+//		System.out.println("Storing file...");
+
+//		String[] args = {String.valueOf(ResourceUtility.getCurrentGroupId()), String.valueOf(ResourceUtility.getCurrentUserId())};
+
+//		FileStorer fileStorer = FileStoreFactory.returnFileStore(fileTree.getFileStoreType(), args);
+
+//		fileStorer.storeFile(ecgFile, folderPath, String.valueOf(ResourceUtility.getCurrentUserId()));
+
+//	}
+
+	
+
+	private synchronized String createRecordNameFolder(UUID folderUuid, String recordName, Long userId) throws UploadFailureException{
+
+//		return Liferay61FileStorer.createFolder(recordName, String.valueOf(userId));
+
+		return "";
+
+	}
+
+
+
+	private boolean findWFDBMatch(ECGFile ecgFile, String folderName){
+
+			
+
+		String name = ecgFile.getFileName().split("\\.")[0];
+
+		String extension = ecgFile.getFileName().split("\\.")[1];
+
+		
+
+		if(extension.toUpperCase().equals("HEA")){
+
+//			return Liferay61FileStorer.fileExists(name + ".dat", folderName, userId, groupId);
+
+		}
+
+		else if (extension.toUpperCase().equals("DAT")){
+
+//			return Liferay61FileStorer.fileExists(name + ".hea", folderName, userId, groupId);
+
+		}
+
+		else{
+
+			return false;
+
+		}
+
+		return false;
+
+	}
+
+
+
+	public UploadStatusDTO convertUploadedFile() throws UploadFailureException {
+
+	
+
+//		initializeLiferayPermissionChecker(user.getUserId());
+
+		//TODO: FileFormat Converter thingy
+
 		return null;
+
 	}
 
-	private String uploadFileFtp(String userId, File file) throws UploadFailureException {
 
-		ftpStartTime = java.lang.System.currentTimeMillis();
-		
-		String outputDir = "";
-		String targetSubjectId = "";
-
-		if (extension(metaData.getFileName()).equalsIgnoreCase("zip")) {
-			outputDir = userId + generateTime();
-		} else {
-			outputDir = userId + name_separator + metaData.getSubjectID();
-		}
-		
-		if (metaData.getSubjectID().equals("")) {
-			targetSubjectId = "null";
-		} else {
-			targetSubjectId = metaData.getSubjectID();
-			targetSubjectId = targetSubjectId.replace("_", "");
-		}
-
-		metaData.setRecordName(metaData.getSubjectID());
-
-		FTPUtility.uploadToRemote(outputDir, file);
-		
-		metaData.setFullFilePath("/" + outputDir + "/");
-		
-		EnumFileType fileType = EnumFileType.valueOf(extension(metaData.getFileName()).toUpperCase());
-		
-		if(fileType == EnumFileType.HEA) {
-			// do not delete a header file just yet, we need it for parsing metadata (the app looks for the local
-			// version of the file, NOT the remote one).  Without this the parsing will fail
-			tempHeaderFile = file.getPath();
-		}
-		else {
-			file.delete();
-		}
-		
-		intermediateEndTime = java.lang.System.currentTimeMillis();
-		
-		ftpTimeElapsed = intermediateEndTime - ftpStartTime;
-
-		return outputDir;
-	}
-
-	private void convertUploadedFile(String outputDirectory, String uId, boolean isPublic) throws UploadFailureException {
-
-		conversionStartTime = java.lang.System.currentTimeMillis();
-		
-			String method = "na";
-			String outfilename = ""; 
-			if(File.separator.equals("\\")) {
-				outfilename = outputDirectory + "//" + metaData.getFileName();
-			}
-			else {
-				outfilename = outputDirectory + File.separator + File.separator + metaData.getFileName();
-			}
-			boolean correctFormat = true;
-
-			switch (fileType) {
-			case RDT:	method = "rdtToWFDB16";					break;
-			case XYZ:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
-			case DAT:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_DATA);		break;
-			case HEA:	method = "wfdbToRDT"; 		metaData.setFileFormat(StudyEntry.WFDB_HEADER);		break;
-			case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ 				break;
-			case TXT:	method = evaluateTextFile(outfilename);	/* will eventually process GE MUSE Text files*/	break;
-			case CSV:	method = "xyFile";						break;
-			case NAT:	method = "na";							break;
-			case GTM:	method = "na";							break;
-			case XML:	method = "hL7";							break;
-			case PHIL103:	method = "philips103ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML103);		break;
-			case PHIL104:	method = "philips104ToWFDB";	metaData.setFileFormat(StudyEntry.PHILIPSXML104);		break;
-			case MUSEXML:	method = "museXML";	metaData.setFileFormat(StudyEntry.MUSEXML);		break;
-			default:	method = "geMuse";						break;
-			}
-			
-			if(fileType == EnumFileType.HEA) {
-				
-				// Parse the locally held header file
-				correctFormat = checkWFDBHeader(tempHeaderFile);
-				
-				// now we can delete the file
-				File file = new File(tempHeaderFile);
-				file.delete();
-			}
-			
-			if(!correctFormat) {
-				throw new UploadFailureException("The header file has not been parsed properly");
-			}
-			
-			System.out.println("method = " + method);
-			
-			if(ResourceUtility.getFtpHost().equals("0") ||
-					ResourceUtility.getFtpUser().equals("0") ||
-					ResourceUtility.getFtpPassword().equals("0")){
-				
-				System.out.println("Missing FTP Configuration.  Cannot run File Conversion Web Service.");
-				return;		
-			}
-			
-			if(ResourceUtility.getNodeConversionService().equals("0")){
-				System.out.println("Missing Web Service Configuration.  Cannot run File Conversion Web Service.");
-				return;	
-			}
-
-			if(!method.equals("na")){
-			
-				LinkedHashMap<String, String> parameterMap = new LinkedHashMap<String, String>();
-			
-				parameterMap.put("userid", uId);
-				parameterMap.put("subjectid", metaData.getSubjectID());
-				parameterMap.put("filename", outfilename);
-
-				parameterMap.put("ftphost", ResourceUtility.getFtpHost());
-				parameterMap.put("ftpuser", ResourceUtility.getFtpUser());
-				parameterMap.put("ftppassword", ResourceUtility.getFtpPassword());
-
-				parameterMap.put("publicprivatefolder", String.valueOf(isPublic));
-				parameterMap.put("verbose", String.valueOf(false));
-				parameterMap.put("service", "DataConversion");
-
-				System.out.println("Calling Web Service.");
-				
-				WebServiceUtility.callWebService(parameterMap, isPublic, method, ResourceUtility.getNodeConversionService(), null);
-			}
-			
-			UploadUtility utility = new UploadUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
-					com.liferay.util.portlet.PortletProps.get("dbPassword"), 
-					com.liferay.util.portlet.PortletProps.get("dbURI"),	
-					com.liferay.util.portlet.PortletProps.get("dbDriver"), 
-					com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
-			
-			utility.storeFileMetaData(metaData);
-			
-			intermediateEndTime = java.lang.System.currentTimeMillis();
-			
-			conversionTimeElapsed = intermediateEndTime - conversionStartTime;
-			
-			annotationStartTime = java.lang.System.currentTimeMillis();
-			
-			// Now do annotations from Muse or Philips files
-			if(fileType == EnumFileType.PHIL103) {
-				ProcessPhilips103 phil103Ann = new ProcessPhilips103(philipsECG103, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
-				phil103Ann.populateAnnotations();
-				
-				ArrayList<AnnotationData> orderList = phil103Ann.getOrderInfo();
-				ArrayList<AnnotationData> dataList = phil103Ann.getDataAcquisitions();
-				ArrayList<AnnotationData> globalList = phil103Ann.getGlobalAnnotations();
-				ArrayList<AnnotationData[]> leadList = phil103Ann.getLeadAnnotations();
-				
-				convertNonLeadAnnotations(globalList, "");
-				convertLeadAnnotations(leadList);
-				convertNonLeadAnnotations(orderList, "");
-				convertNonLeadAnnotations(dataList, "");
-			}
-			else if(fileType == EnumFileType.PHIL104) {
-				ProcessPhilips104 phil104Ann = new ProcessPhilips104(philipsECG104, metaData.getStudyID(), metaData.getUserID(), metaData.getRecordName(), metaData.getSubjectID());
-				phil104Ann.populateAnnotations();
-				
-				ArrayList<AnnotationData> orderList = phil104Ann.getOrderInfo();
-				ArrayList<AnnotationData> dataList = phil104Ann.getDataAcquisitions();
-				ArrayList<AnnotationData> globalList = phil104Ann.getCrossleadAnnotations();
-				ArrayList<AnnotationData[]> leadList = phil104Ann.getLeadAnnotations();
-				
-				convertNonLeadAnnotations(globalList, "");
-				convertLeadAnnotations(leadList);
-				convertNonLeadAnnotations(orderList, "");
-				convertNonLeadAnnotations(dataList, "");
-			}
-			
-			intermediateEndTime = java.lang.System.currentTimeMillis();
-			
-			annotationTimeElapsed = intermediateEndTime - annotationStartTime;
-			
-	}
 
 	// TODO: make this into a function which determines which kind of text file
+
 	// this is, and returns the correct method to use.
+
 	private String evaluateTextFile(String fName) {
+
 		String method = "geMuse";
 
+
+
 		return method;
+
 	}
+
 	
+
 	private String extension(String filename){
+
 		return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+
 	}
+
 	
-	private boolean checkWFDBHeader(String fileLocation) {
+
+	//TODO [VILARDO] TRY TO MOVE TO WEB SERVICE
+
+	private boolean checkWFDBHeader(ECGFile ecgFile) {
+
 		
+
 		// To find out more about the WFDB header format, go to:
+
 		// http://www.physionet.org/physiotools/wag/header-5.htm
+
 		//
+
 		// The goal is to extract the metadata information needed without the need for using the physionet libraries
+
 		
+
 		boolean returnValue = false;
 
-		FileInputStream file = null;
 		DataInputStream wfdbInputStream = null;
-		
+
 		BufferedReader br = null;
+
 		
+
 		try{
 
-			file = new FileInputStream(fileLocation);
-			wfdbInputStream = new DataInputStream(file);
+			InputStream inputStream = new ByteArrayInputStream(ecgFile.getEcgDataFileAsBytes());
+
+			wfdbInputStream = new DataInputStream(inputStream);
+
 		    br = new BufferedReader(new InputStreamReader(wfdbInputStream));
+
 		    String strLine;
+
 		    String[] words;
+
 		    //Read File Line By Line
+
 		    
+
 		    while ((strLine = br.readLine()) != null)   {
+
 		      // Print the content on the console
+
 		    	
+
 		    	if(strLine.length()>0) {
+
 		    		
+
 		    		// check to see if this line is a comment or not
+
 		    		if(!strLine.startsWith("#")) {
 
+
+
 		    			returnValue = true;
+
 		    			break;
+
 		    		}
+
 		    	}
+
 		    }
+
 		    
+
 		    // Begin parsing out different sections of the WFDB header file.  The array size should be two or more.
+
 		    words = strLine.split("\\s");
+
 		    
+
 		    if(words != null && words.length>=2) {
+
 		    	
+
 		    	// Step 1:  Extract record name.  There is more after the "/", but it will be parsed out and ignored
+
 		    	String[] firstField = words[0].split("/");
+
 		    	if(firstField != null && firstField.length>0) {
+
 		    		// validate the record name here against the record name in the metadata
-		    		if(!(firstField[0].equals(metaData.getRecordName()))) {
+
+		    		if(!(firstField[0].equals(ecgFile.getRecordName()))) {
+
 		    			br.close();
+
 		    			return false;
+
 		    		}
+
 		    	}
+
 		    	else {
+
 		    		br.close();
+
 		    		return false;
+
 		    	}
+
 		    	
+
 		    	// Step 2:  Get the number of leads
+
 		    	int numLeads = Integer.parseInt(words[1]);
-		    	metaData.setChannels(numLeads);
+
+		    	ecgFile.setChannels(numLeads);
+
 		    	
+
 		    	// Step 3:  If there is a third section, parse it out.  The sampling frequency will be the first value that 
+
 		    	//          is extracted from it.  If it is not present, the default is 250 (already set in metadata class)
+
 		    	if(words.length >= 3) {
+
 			    	String[] thirdField = words[2].split("/");
+
 			    	if(thirdField != null && thirdField.length>0) {
+
 			    		float sampFreq = Float.parseFloat(thirdField[0]);
-			    		metaData.setSampFrequency(sampFreq);
+
+			    		ecgFile.setSampFrequency(sampFreq);
+
 			    	}
+
 		    		
+
 		    		// Step 4:  If there is a fourth field, then that is the number of samples per signal
+
 		    		//          After that, we do not need anything else.
+
 		    		if(words.length >= 4) {
+
 		    			int numPoints = Integer.parseInt(words[3]);
+
 		    			
+
 		    			// if zero, then ignore
+
 		    			if(numPoints>0) {
-		    				metaData.setNumberOfPoints(numPoints);
+
+		    				ecgFile.setNumberOfPoints(numPoints);
+
 		    			}
+
 		    		}		
+
 		    	}
+
 		    }
+
 		    else {  //This is an improperly formed header file.  There should be at least two fields, separated by spaces
+
 		    	returnValue = false;
+
 		    }
+
 		    
+
 			if(wfdbInputStream != null) {
+
 				wfdbInputStream.close();
+
 			}
+
 			if(br != null) {
+
 				br.close();
-			}
-			if(file != null) {
-				file.close();
+
 			}
 
-		}catch (Exception e){ //Catch exception if any
-			System.err.println("Error: " + e.getMessage());
+
+
+		}catch (Exception e){
+
+			log.error("Error: " + e.getMessage());
+
 			try {
+
 				if(wfdbInputStream != null) {
+
 					wfdbInputStream.close();
+
 				}
+
 				if(br != null) {
+
 					br.close();
+
 				}
-				if(file != null) {
-					file.close();
-				}
+
 			} catch (IOException e2) {
-				System.err.println("Error: " + e2.getMessage());
+
+				log.error("Error: " + e2.getMessage());
+
 			}
+
 			returnValue = false;
+
 			return returnValue;
+
 		}	
+
 		return returnValue;
+
 	}
 
-	private String generateTime() {
+	
 
-		// create a unique folder name based on current date/time plus a random
-		// number.
-		// Easier for humans read than a GUID and sorts in a meaningful way.
+	private void initializeLiferayPermissionChecker(long userId) throws UploadFailureException {
+
 		
-		Date newDate = new Date();
-		String dateString = newDate.toString();	
-		SimpleDateFormat newDateFormat = new SimpleDateFormat("MMddHHmmss");
+
+		try{
+
+			PrincipalThreadLocal.setName(userId);
+
+			User user = UserLocalServiceUtil.getUserById(userId);
+
+	        PermissionChecker permissionChecker = PermissionCheckerFactoryUtil.create(user);
+
+	        PermissionThreadLocal.setPermissionChecker(permissionChecker);
+
+		}catch (Exception e){
+
+			throw new UploadFailureException("Fail on premission checker initialization. [userId="+userId+"]", e);
+
+		}		
+
+	}
+
+
+
+	public void fileUpload(UUID folderUuid, String fileName, long fileSize, InputStream fileStream, String studyID, String dataType){
+
+		
+
+		UploadStatusDTO status = null;
+
+		String recordName = extractRecordName(fileName);
+
+		
+
 		try {
-			Date parsedDate = newDateFormat.parse(dateString);
-			System.out.println("File date string: " + parsedDate.toString());
-		} catch (ParseException e) {
-			System.out.println("Date thingy failed.");
-			e.printStackTrace();
-		}
-				
-		Calendar now = Calendar.getInstance();
-		
-		int year = now.get(Calendar.YEAR);
-		int month = now.get(Calendar.MONTH) + 1;
-		int day = now.get(Calendar.DATE);
-		int hour = now.get(Calendar.HOUR_OF_DAY); // 24 hour format
-		int minute = now.get(Calendar.MINUTE);
-		int second = now.get(Calendar.SECOND);
-		String date = new Integer(year).toString();
 
-		if (month < 10)
-			date = date + "0"; // zero padding single digit months to aid
-								// sorting.
-		date = date + new Integer(month).toString();
+			if (!fileTree.fileExistsInFolder(fileName, folderUuid)) {
 
-		if (day < 10)
-			date = date + "0"; // zero padding to aid sorting.
-		date = date + new Integer(day).toString();
+				// The new 5th parameter has been added for character encoding,
 
-		String time = "";
+				// specifically for XML files. If null is passed in,
 
-		if (hour < 10)
-			time = time + "0"; // zero padding to aid sorting.
-		time = time + new Integer(hour).toString();
+				// the function will use UTF-8 by default
 
-		if (minute < 10)
-			time = time + "0"; // zero padding to aid sorting.
-		time = time + new Integer(minute).toString();
+				ECGFile ecgFile = createECGFileWrapper(fileStream, fileName,
 
-		if (second < 10)
-			time = time + "0"; // zero padding to aid sorting.
-		time = time + new Integer(second).toString() + "|";
+					studyID, dataType, recordName, recordName, fileSize);
 
-		// add the random number just to be sure we avoid name collisions
-		Random rand = new Random();
-		time = time + rand.nextInt(1000);
 
-		metaData.setDate(month + "/" + day + "/" + year);
 
-		return date + time;
-	}
-	
-	// Unfortunately, the two different data structures for Philips are not interchangeable.  Since the underlying 
-	// schema is different, different beans are used to house the structure.  So while similar on the surface, under
-	// the hood they are organized differently.
-	private void extractPhilips103Data(File file) throws IOException, JAXBException {
-		philipsECG103 = SierraEcgFiles.preprocess(file);
-		leadData103 = SierraEcgFiles.extractLeads(file);
-		Signalcharacteristics signalMetaData = philipsECG103.getDataacquisition().getSignalcharacteristics();
-		
-		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
-		metaData.setChannels(Integer.valueOf(signalMetaData.getNumberchannelsallocated()));
-		metaData.setNumberOfPoints(leadData103[0].size() * metaData.getChannels());
-		
-	}
-	
-	private void extractPhilips104Data(File file) throws IOException, JAXBException {
-		philipsECG104 = org.cvrgrid.philips.SierraEcgFiles.preprocess(file);
-		leadData104 = org.cvrgrid.philips.SierraEcgFiles.extractLeads(file);
-		org.cvrgrid.philips.jaxb.beans.Signalcharacteristics signalMetaData = philipsECG104.getDataacquisition().getSignalcharacteristics();
-		
-		metaData.setSampFrequency(Float.valueOf(signalMetaData.getSamplingrate()));
-		metaData.setChannels(signalMetaData.getNumberchannelsallocated().intValue());  // Method returns a BigInteger, so a conversion to int is required.
-		metaData.setNumberOfPoints(leadData104[0].size() * metaData.getChannels());
+				status = storeUploadedFile(ecgFile,	fileTree.getSelectedFolderUuid());
 
-	}
-	
-	private void extractMuseXMLData() {
-		Element rootElement = xmlJdom.getRootElement();
-		List waveformElements = rootElement.getChildren("Waveform");
-		
-		// Since the DTD was unable to be found, the XML had to be traversed one level at a time
-		if(!(waveformElements.isEmpty())) {
-			Iterator waveformIter = waveformElements.iterator();
-			while(waveformIter.hasNext()) {
-				Element nextWaveform = (Element)waveformIter.next();
-				Element waveformType = nextWaveform.getChild("WaveformType");
-				
-				// Check to make sure there are valid waveforms, then get each WaveFormData tag, which is a child of a LeadData tag
-				if((waveformType != null) && (waveformType.getText().equals("Rhythm"))) {
-					
-					// get the Sampling Rate of the waveform in the process
-					metaData.setSampFrequency(Float.valueOf(nextWaveform.getChild("SampleBase").getText()));
-					
-					List leadDataList = nextWaveform.getChildren("LeadData");
-					
-					if(!(leadDataList.isEmpty())) {
-						metaData.setChannels(leadDataList.size());
-						
-						Iterator leadIter = leadDataList.iterator();
-						
-						Element leadData = (Element)leadIter.next();
-						Element sampleCount = leadData.getChild("LeadSampleCountTotal");
-							
-						metaData.setNumberOfPoints(Integer.valueOf(sampleCount.getText()) * metaData.getChannels());
+				if (status != null) {
+
+					if (status.getMessage() == null) {
+
+						start();
+
+						// msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" ,
+
+						// event.getFile().getFileName() + " is uploaded.");
+
 					}
-				}
-			}
-		}
-	}
-	
-	public static void convertAnnotations(AnnotationData[] annotationArray, boolean isLeadAnnotation, String groupName) throws UploadFailureException {
-		//AnnotationUtility dbAnnUtility = new AnnotationUtility("waveformUser", "d@rks0uls!", "xmldb:exist://128.220.76.161:8080/exist-1.4.2-rev16251/xmlrpc", "org.exist.xmldb.DatabaseImpl", "/db/waveformrecords");
-		AnnotationUtility dbAnnUtility = new AnnotationUtility(com.liferay.util.portlet.PortletProps.get("dbUser"),
-				com.liferay.util.portlet.PortletProps.get("dbPassword"), 
-				com.liferay.util.portlet.PortletProps.get("dbURI"),	
-				com.liferay.util.portlet.PortletProps.get("dbDriver"), 
-				com.liferay.util.portlet.PortletProps.get("dbMainDatabase"));
-		
-		for(AnnotationData annData : annotationArray) {			
-			boolean success = true;
-			
-			if(isLeadAnnotation) {
-				System.out.println("Storing lead index " + annData.getLeadIndex());
-				success = dbAnnUtility.storeLeadAnnotationNode(annData);
-				
-			}
-			else {
-				success = dbAnnUtility.storeComment(annData);
-			}
-			
-			if(!success) {
-				throw new UploadFailureException("Annotations for Philips file failed to enter the database properly");
-			}
-		}
-	}
-	
-	private void convertLeadAnnotations(ArrayList<AnnotationData[]> allLeadAnnotations) throws UploadFailureException {
-		for(int i=0; i<allLeadAnnotations.size(); i++) {
-			if(allLeadAnnotations.get(i).length != 0) {
-				System.out.println("There are annotations in this lead.  The size is " + allLeadAnnotations.get(i).length);
-				convertAnnotations(allLeadAnnotations.get(i), true, "");
-			}
-		}
-	}
-	
-	private void convertNonLeadAnnotations(ArrayList<AnnotationData> allAnnotations, String groupName) throws UploadFailureException {
-		AnnotationData[] annotationArray = new AnnotationData[allAnnotations.size()];
-		annotationArray = allAnnotations.toArray(annotationArray);
-		
-		
-		convertAnnotations(annotationArray, false, groupName);
-	}
-	
-	
-	/**
-	 * Helper method to build a <code>jdom.org.Document</code> from an 
-	 * XML document represented as a String
-	 * @param  xmlDocAsString  <code>String</code> representation of an XML
-	 *         document with a document declaration.
-	 *         e.g., <?xml version="1.0" encoding="UTF-8"?>
-	 *                  <root><stuff>Some stuff</stuff></root>
-	 * @return Document from an XML document represented as a String
-	 */
-	private static Document build(String xmlDocAsString) 
-	        throws JDOMException {
-		Document doc = null;
-	    SAXBuilder builder = new SAXBuilder();
-	    Reader stringreader = new StringReader(xmlDocAsString);
-	    try {
-	    	doc = builder.build(stringreader);
-	    } catch(IOException ioex) {
-	    	ioex.printStackTrace();
-	    }
-	    return doc;
-	}
-	
-	private static String convertStreamToString(InputStream is, String encoding) {
-	    Scanner inputScan = new Scanner(is, encoding).useDelimiter("\\A");
-	    if(inputScan.hasNext()) {
-	    	return inputScan.next();
-	    }
 
-	    return "";
+				}
+
+			} else {
+
+				throw new UploadFailureException("This file already exists in selected folder.");
+
+			}
+
+
+
+		} catch (UploadFailureException ufe) {
+
+			status = new UploadStatusDTO(null, null, null, null, null,
+
+					Boolean.FALSE, fileName	+ " failed because:  " + ufe.getMessage());
+
+			status.setRecordName(recordName);
+
+
+
+		} catch (Exception ex) {
+
+			ex.printStackTrace();
+
+			status = new UploadStatusDTO(null, null, null, null, null,
+
+					Boolean.FALSE, fileName + " failed to upload for unknown reasons");
+
+			status.setRecordName(recordName);
+
+		}
+
+		this.addToBackgroundQueue(status);
+
 	}
+
 	
+
+	public void addToBackgroundQueue(UploadStatusDTO dto) {
+
+		if(dto!=null){
+
+			if(this.getBackgroundQueue() == null){
+
+				setBackgroundQueue(new ArrayList<UploadStatusDTO>());
+
+			}
+
+			int index = this.getBackgroundQueue().indexOf(dto);
+
+			if(index != -1){
+
+				UploadStatusDTO older = this.getBackgroundQueue().get(index);
+
+				if(EnumUploadState.WAIT.equals(older.getState()) || 
+
+				   EnumUploadState.ERROR.equals(older.getState())){
+
+					this.getBackgroundQueue().remove(index);	
+
+				}
+
+			}
+
+			this.getBackgroundQueue().add(dto);	
+
+		}
+
+	}
+
+	
+
+	@SuppressWarnings("unchecked")
+
+	public List<UploadStatusDTO> getBackgroundQueue() {
+
+		PortletSession session = (PortletSession) FacesContext.getCurrentInstance().getExternalContext().getSession(false);
+
+		return (List<UploadStatusDTO>) session.getAttribute("upload.backgroundQueue");
+
+	}
+
+	
+
+	public void setBackgroundQueue(List<UploadStatusDTO> backgroundQueue) {
+
+		PortletSession session = (PortletSession) FacesContext.getCurrentInstance().getExternalContext().getSession(false);
+
+		session.setAttribute("upload.backgroundQueue", backgroundQueue);
+
+	}
+
+	
+
+    private ECGFile createECGFileWrapper(InputStream file, String fileName, String studyID, String dataType, 
+
+    		String subjectId, String recordName, long fileSize) throws UploadFailureException{
+
+    	
+
+    	byte[] fileBytes = new byte[(int)fileSize];
+
+    	ECGFile ecgFile = new ECGFile(fileBytes, fileName, fileSize, subjectId, recordName, dataType, studyID);
+
+    	
+
+		try {
+
+			file.read(fileBytes);
+
+		} catch (IOException e) {
+
+			log.error(e.getMessage());
+
+			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);
+
+		}
+
+		
+
+		return ecgFile;
+
+    }
+
+
+
+	private String extractRecordName(String fileName) {
+
+
+
+		String recordName = "";
+
+		int location = fileName.indexOf(".");
+
+		if (location != -1) {
+
+			recordName = fileName.substring(0, location);
+
+		} else {
+
+			recordName = fileName;
+
+		}
+
+		return recordName;
+
+	}
+
 }
