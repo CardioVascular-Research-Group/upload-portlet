@@ -29,7 +29,7 @@
 							value="#{fileUploadBacking.fileTree.treeRoot}" 
 							var="node">
 							
-							<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" update="fileTree"/>
+							<p:ajax event="select" listener="#{fileUploadBacking.onNodeSelect}" update=""/>
 							
 							<p:treeNode expandedIcon="ui-icon-folder-open" collapsedIcon="ui-icon-folder-collapsed">
 								<h:outputText value="#{node}" />
@@ -85,6 +85,15 @@
 			    		<h:panelGroup layout="block" rendered="#{fileUploadBacking.summary != null}" id="summary" styleClass="summary">
 				    		<span>#{fileUploadBacking.summary}</span>
 					    	<p:commandLink styleClass="ui-icon ui-icon-close remove" oncomplete="removeAll();" update="backgroundQueue" actionListener="#{fileUploadBacking.removeAllDoneItem}"/>
+					    	
+					    	<h:panelGroup layout="block" rendered="#{fileUploadBacking.errorList != null}" id="errorsBox">
+					    		<ul>
+					    		<ui:repeat var="msg" value="#{fileUploadBacking.errorList}" >
+					    			<li>#{msg}</li>	
+					    		</ui:repeat>
+					    		</ul>
+				    		</h:panelGroup>
+					    	
 				    	</h:panelGroup>
 			    	
 				    	<p:dataTable id="backgroundQueue"
@@ -104,7 +113,7 @@
 							</p:column>
 							
 							<p:column headerText="Phase" width="26%" styleClass="queuePhaseColumn">
-								<span title="#{item.message != null ? item.message : ''}" class="#{item.message != null ? 'error' : ''}"><h:outputText value="#{item.state}" /></span>
+								<span title="#{item.message != null ? item.message : ''}" class="#{item.state}"><h:outputText value="#{item.state}" /></span>
 								<p:commandLink styleClass="ui-icon ui-icon-close" update="backgroundQueue" actionListener="#{fileUploadBacking.removeTableItem}" rendered="#{item.progress == 100}">
 									<f:param name="index" value="#{index}"/>
 								</p:commandLink>

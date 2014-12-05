@@ -59,7 +59,7 @@
 		
 		var waitCount = 0;
 		for(var i = 0; i < phaseColumns.length; i++){
-    		continueListening = !(phaseColumns[i].innerHTML == 'DONE' || phaseColumns[i].innerHTML == 'ERROR' || phaseColumns[i].innerHTML == 'WAIT');
+    		continueListening = !(phaseColumns[i].innerHTML == 'DONE' || phaseColumns[i].innerHTML == 'ERROR' || phaseColumns[i].innerHTML == 'WARN' || phaseColumns[i].innerHTML == 'WAIT');
     		
     		if(continueListening){
     			break;

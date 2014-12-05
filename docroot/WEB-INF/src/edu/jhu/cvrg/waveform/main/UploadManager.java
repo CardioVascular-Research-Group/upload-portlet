@@ -31,21 +31,32 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.axiom.om.OMElement;
+import org.apache.commons.io.input.XmlStreamReader;
 import org.apache.log4j.Logger;
 
+import com.liferay.counter.service.CounterLocalServiceUtil;
 import com.liferay.faces.portal.context.LiferayFacesContext;
 import com.liferay.portal.kernel.exception.PortalException;
 import com.liferay.portal.kernel.exception.SystemException;
 import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.repository.model.Folder;
+import com.liferay.portal.model.ResourceAction;
+import com.liferay.portal.model.ResourceConstants;
+import com.liferay.portal.model.ResourcePermission;
+import com.liferay.portal.model.Role;
 import com.liferay.portal.model.User;
 import com.liferay.portal.security.auth.PrincipalThreadLocal;
+import com.liferay.portal.security.permission.ActionKeys;
 import com.liferay.portal.security.permission.PermissionChecker;
 import com.liferay.portal.security.permission.PermissionCheckerFactoryUtil;
 import com.liferay.portal.security.permission.PermissionThreadLocal;
+import com.liferay.portal.service.ResourceActionLocalServiceUtil;
+import com.liferay.portal.service.ResourcePermissionLocalServiceUtil;
+import com.liferay.portal.service.RoleLocalServiceUtil;
 import com.liferay.portal.service.ServiceContext;
 import com.liferay.portal.service.UserLocalServiceUtil;
 import com.liferay.portlet.documentlibrary.DuplicateFileException;
+import com.liferay.portlet.documentlibrary.model.DLFolder;
 import com.liferay.portlet.documentlibrary.service.DLAppLocalServiceUtil;
 
 import edu.jhu.cvrg.data.dto.UploadStatusDTO;
@@ -58,8 +69,6 @@ import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
-
-import org.apache.commons.io.input.XmlStreamReader;
 
 public class UploadManager extends Thread{
 
@@ -94,13 +103,25 @@ public class UploadManager extends Thread{
 			if(db!=null){
 				dto.setStatus(Boolean.FALSE);
 				dto.setMessage(e.getMessage());
-				try {
-					db.storeUploadStatus(dto);
-				} catch (DataStorageException e1) {
-					log.error("Error on update the upload status." + e1.getMessage());
+				if(dto.getDocumentRecordId() != null){
+					try {
+						db.storeUploadStatus(dto);
+					} catch (DataStorageException e1) {
+						log.error("Error on update the upload status." + e1.getMessage());
+					}
 				}
 			}else{
 				e.printStackTrace();	
+			}
+			
+			try{
+				if(liferayFile != null){
+					DLAppLocalServiceUtil.deleteFolder(liferayFile.getFolder().getFolderId());
+				}
+			} catch (SystemException e1){
+				log.error("Error on cleanup error process." + e1.getMessage());
+			} catch (PortalException e1) {
+				log.error("Error on cleanup error process." + e1.getMessage());
 			}
 		}
 	}
@@ -418,6 +439,23 @@ public class UploadManager extends Thread{
 				throw new UploadFailureException("Please select a folder");
 			}
 			
+			Role userRole = RoleLocalServiceUtil.getRole(companyId, "POWER USER");
+			ResourcePermission resourcePermission = null;
+
+			resourcePermission = ResourcePermissionLocalServiceUtil.createResourcePermission(CounterLocalServiceUtil.increment());
+			resourcePermission.setCompanyId(companyId);
+			resourcePermission.setName(DLFolder.class.getName());
+			resourcePermission.setScope(ResourceConstants.SCOPE_INDIVIDUAL);
+			resourcePermission.setPrimKey(String.valueOf(recordNameFolder.getPrimaryKey()));
+			resourcePermission.setRoleId(userRole.getRoleId());
+			
+			ResourceAction resourceActionDelete = ResourceActionLocalServiceUtil.getResourceAction(DLFolder.class.getName(), ActionKeys.DELETE);
+			ResourceAction resourceActionView = ResourceActionLocalServiceUtil.getResourceAction(DLFolder.class.getName(), ActionKeys.VIEW);
+			ResourceAction resourceActionAccess = ResourceActionLocalServiceUtil.getResourceAction(DLFolder.class.getName(), ActionKeys.ACCESS);
+			ResourceAction resourceActionAddDoc = ResourceActionLocalServiceUtil.getResourceAction(DLFolder.class.getName(), ActionKeys.ADD_DOCUMENT);
+			resourcePermission.setActionIds(resourceActionDelete.getBitwiseValue()+resourceActionView.getBitwiseValue()+resourceActionAccess.getBitwiseValue()+resourceActionAddDoc.getBitwiseValue());
+			ResourcePermissionLocalServiceUtil.addResourcePermission(resourcePermission);
+			
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("Error on record name folder's creation.", e);
@@ -609,7 +647,7 @@ public class UploadManager extends Thread{
 				if(params == null){
 					throw new UploadFailureException("Webservice return params are null.");
 				}else{
-					if(params.get("documentId").getText() != null){
+					if(params.get("documentId") != null && params.get("documentId").getText() != null){
 						long docId = Long.parseLong(params.get("documentId").getText());
 						
 						log.info("["+docId+"]The runtime file validation is = " + validationTime + " milliseconds");
@@ -768,6 +806,10 @@ public class UploadManager extends Thread{
 			throw new UploadFailureException("Fail on permission checker initialization. [userId="+userId+"]", e);
 		}
 		
+	}
+	
+	public FileEntry getLiferayFile() {
+		return liferayFile;
 	}
 
 }

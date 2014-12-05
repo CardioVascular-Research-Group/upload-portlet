@@ -67,7 +67,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 	public void init() {
 		userModel = ResourceUtility.getCurrentUser();
 		if(fileTree == null && userModel != null){
-			fileTree = new LocalFileTree(userModel.getUserId());
+			fileTree = new LocalFileTree(userModel.getUserId(), "hea");
 			
 			loadBackgroundQueue();
 		}
@@ -94,6 +94,9 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			fileToSave = event.getFile().getInputstream();
 
 			String fileName = event.getFile().getFileName();
+			
+			fileName = fileName.replaceAll(" ", "_");
+			
 			long fileSize = event.getFile().getSize();
 			
 			int location = fileName.indexOf(".");
@@ -112,7 +115,6 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 				if(status != null){
 					if(status.getMessage() == null){
 						uploadManager.start();
-						//msg = new FacesMessage(FacesMessage.SEVERITY_INFO, "" , event.getFile().getFileName() + " is uploaded.");	
 					}
 				}
 			}else{
@@ -151,9 +153,30 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 	}
 	
     public void onComplete() {
-    	fileTree.initialize(userModel.getUserId());
+    	fileTree.refresh();
     	messages.clear();
     }
+    
+    public List<String> getErrorList(){
+		List<String> errorList = null;
+
+    	List<UploadStatusDTO> backgroundQueue = this.getBackgroundQueue();
+    	if(backgroundQueue!=null && !backgroundQueue.isEmpty()){
+    		errorList = new ArrayList<String>();
+			for (UploadStatusDTO u : backgroundQueue) {
+				if(u != null){
+	    			switch (u.getState()) {
+						case ERROR: errorList.add("Error on "+u.getRecordName()+" : " + u.getMessage()); break;
+						case WARN: errorList.add("Annotation extraction error on "+u.getRecordName()+" : " + u.getMessage()); break;
+						default:break;
+					}
+				}
+			}
+    	}
+		
+		return errorList;
+    }
+    
     
     public String getSummary(){
     	int done = 0;
@@ -165,6 +188,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
     			if(u != null){
 	    			switch (u.getState()) {
 						case DONE: done++; break;
+						case WARN: done++; break;
 						case ERROR: error++; break;
 						default:break;
 					}

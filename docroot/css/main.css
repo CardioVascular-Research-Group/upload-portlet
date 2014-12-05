@@ -226,7 +226,7 @@ div.ui-fileupload{
 	height:100%;
 }
 
-td.queuePhaseColumn span , div.summary span, td.recordName div, td.recordName span{
+td.queuePhaseColumn span , div.summary span, div.summary ul, td.recordName div, td.recordName span{
 	float:left
 }
 
@@ -235,6 +235,15 @@ td.queuePhaseColumn a , div.summary a{
 }
 
 
-td.queuePhaseColumn span.error{
+td.queuePhaseColumn span.DONE{
 	font-weight: bold!important;
+	color: green;
+}
+td.queuePhaseColumn span.ERROR{
+	font-weight: bold!important;
+	color: red;
+}
+td.queuePhaseColumn span.WARN{
+	font-weight: bold!important;
+	color: rgb(243, 206, 12);
 }
