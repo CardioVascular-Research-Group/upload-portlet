@@ -37,6 +37,7 @@ import javax.portlet.PortletSession;
 import org.primefaces.context.RequestContext;
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
+import org.primefaces.model.UploadedFile;
 
 import com.liferay.portal.model.User;
 
@@ -44,9 +45,7 @@ import edu.jhu.cvrg.data.dto.UploadStatusDTO;
 import edu.jhu.cvrg.data.enums.UploadState;
 import edu.jhu.cvrg.data.factory.ConnectionFactory;
 import edu.jhu.cvrg.data.util.DataStorageException;
-import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.main.UploadManager;
-import edu.jhu.cvrg.waveform.model.FileTreeNode;
 import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 
@@ -58,7 +57,6 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 	private static final long serialVersionUID = -4715402539808469047L;
 	
 	private LocalFileTree fileTree;
-	private String text;  
 	private User userModel;
 
 	private List<FacesMessage> messages;
@@ -67,8 +65,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 	public void init() {
 		userModel = ResourceUtility.getCurrentUser();
 		if(fileTree == null && userModel != null){
-			fileTree = new LocalFileTree(userModel.getUserId(), "hea");
-			
+			fileTree = new LocalFileTree(userModel.getUserId());
 			loadBackgroundQueue();
 		}
 		messages = new ArrayList<FacesMessage>();
@@ -76,84 +73,40 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 	
     public void handleFileUpload(FileUploadEvent event) {
     	//TODO: Implement a means for the user to input the studyID and the datatype.
-    	fileUpload(event, "Mesa",  "Rhythm Strips");
-    }
-    
-    private void fileUpload(FileUploadEvent event, String studyID, String datatype) {
-
-    	getLog().info("Handling upload... Folder name is " + fileTree.getSelectFolder().getName());
-
-    	UploadManager uploadManager = new UploadManager();
     	
-		InputStream fileToSave;
+    	if(fileTree.getSelectedNode() == null){
+    		fileTree.setDefaultSelected();
+    	}
+    	
+    	long folderUuid = fileTree.getSelectedFolderUuid();
+		UploadedFile file = event.getFile();
+		String fileName = file.getFileName();
+		fileName = fileName.replaceAll(" ", "_");
+		long fileSize = file.getSize();
 		
-		UploadStatusDTO status = null;
-		String recordName = null;
-		
+		InputStream fileStream = null;
 		try {
-			fileToSave = event.getFile().getInputstream();
-
-			String fileName = event.getFile().getFileName();
-			
-			fileName = fileName.replaceAll(" ", "_");
-			
-			long fileSize = event.getFile().getSize();
-			
-			int location = fileName.indexOf(".");
-			if (location != -1) {
-				recordName = fileName.substring(0, location);
-			} else {
-				recordName = fileName;
-			}
-
-			FileTreeNode existingFileNode = fileTree.getLeafByName(fileName);
-			
-			if( existingFileNode == null){
-				// The new 5th parameter has been added for character encoding, specifically for XML files.  If null is passed in,
-				// the function will use UTF-8 by default
-				status = uploadManager.processUploadedFile(fileToSave, fileName, recordName, fileSize, studyID, datatype, fileTree.getSelectFolder());
-				if(status != null){
-					if(status.getMessage() == null){
-						uploadManager.start();
-					}
-				}
-			}else{
-				throw new UploadFailureException("This file already exists at " + existingFileNode.getTreePath() +" folder.");
-			}
+			fileStream = file.getInputstream();
 		} catch (IOException e) {
-			status = new UploadStatusDTO(null, null, null, null, null, Boolean.FALSE, event.getFile().getFileName() + " failed to upload.  Could not read file.");
-			status.setRecordName(recordName);
-			
-		} catch (UploadFailureException ufe) {
-			status = new UploadStatusDTO(null, null, null, null, null, Boolean.FALSE, event.getFile().getFileName() + " failed because:  " + ufe.getMessage());
-			status.setRecordName(recordName);
-			
-		} catch (Exception ex) {
-			ex.printStackTrace();
-			status = new UploadStatusDTO(null, null, null, null, null, Boolean.FALSE, event.getFile().getFileName() + " failed to upload for unknown reasons");
-			status.setRecordName(recordName);
+			getLog().error("Exception is:", e);
 		}
-		this.addToBackgroundQueue(status);
-		
+		UploadManager uploadManager = new UploadManager();
+    	uploadManager.fileUpload(folderUuid, fileName, fileSize, fileStream, "Mesa", "Rhythm Strips", fileTree);
+    	
     }
     
     public void onNodeSelect(NodeSelectEvent event) { 
-    	getLog().info("Node selected... ID is " + fileTree.getSelectedNodeId());
+    	getLog().info("Node selected... ID is " + fileTree.getSelectedNode().getUuid());
     }
     
-    public String getText() {return text;}  
-    public void setText(String text) {this.text = text;}
-
-	public LocalFileTree getFileTree() {
+    public LocalFileTree getFileTree() {
 		return fileTree;
 	}
 
-	public void setFileTree(LocalFileTree fileTree) {
-		this.fileTree = fileTree;
-	}
 	
     public void onComplete() {
-    	fileTree.refresh();
+    	fileTree.initialize(this.getUser().getUserId());
+    	//fileTree.refresh();
     	messages.clear();
     }
     
@@ -222,7 +175,6 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 		return userModel;
 	}
 	
-	
 	public void loadBackgroundQueue(){
 		Set<Long> listenIds = null;
 		
@@ -237,21 +189,20 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			}
         }
         if(listenIds != null && !listenIds.isEmpty()){
-        	List<UploadStatusDTO> tmpBackgroundQueue = null;
-			try {
-				tmpBackgroundQueue = ConnectionFactory.createConnection().getUploadStatusByUserAndDocId(userModel.getUserId(), listenIds);
-			} catch (DataStorageException e) {
+        	try {
+				List<UploadStatusDTO> tmpBackgroundQueue  = ConnectionFactory.createConnection().getUploadStatusByUserAndDocId(userModel.getUserId(), listenIds);
+				if(tmpBackgroundQueue != null){
+			        for (UploadStatusDTO s : tmpBackgroundQueue) {
+						if(backgroundQueue.contains(s)){
+							backgroundQueue.get(backgroundQueue.indexOf(s)).update(s);
+						}
+					}
+		        }else{
+		        	backgroundQueue.clear();
+		        }
+        	} catch (DataStorageException e) {
 				this.getLog().error("Error on load the background upload queue. " + e.getMessage());
 			}
-        	if(tmpBackgroundQueue != null){
-		        for (UploadStatusDTO s : tmpBackgroundQueue) {
-					if(backgroundQueue.contains(s)){
-						backgroundQueue.get(backgroundQueue.indexOf(s)).update(s);
-					}
-				}
-	        }else{
-	        	backgroundQueue.clear();
-	        }
         }
         
         if(backgroundQueue != null){
@@ -272,12 +223,10 @@ public class FileUploadBacking extends BackingBean implements Serializable{
         
 	}
 
-	public List<UploadStatusDTO> getBackgroundQueue() {
-		PortletSession session = (PortletSession) FacesContext.getCurrentInstance().getExternalContext().getSession(false);
-		return (List<UploadStatusDTO>) session.getAttribute("upload.backgroundQueue");
-	}
-	
-	
+	public List<UploadStatusDTO> getBackgroundQueue(){
+    	return UploadManager.getBackgroundQueue();
+    }
+    
 	public void addToBackgroundQueue(UploadStatusDTO dto) {
 		if(dto!=null){
 			if(this.getBackgroundQueue() == null){
