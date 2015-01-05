@@ -32,20 +32,24 @@ import javax.faces.application.FacesMessage;
 import javax.faces.bean.ManagedBean;
 import javax.faces.bean.ViewScoped;
 import javax.faces.context.FacesContext;
+import javax.faces.event.ActionEvent;
 import javax.portlet.PortletSession;
 
 import org.primefaces.context.RequestContext;
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.event.NodeSelectEvent;
+import org.primefaces.model.TreeNode;
 import org.primefaces.model.UploadedFile;
 
 import com.liferay.portal.model.User;
 
 import edu.jhu.cvrg.data.dto.UploadStatusDTO;
 import edu.jhu.cvrg.data.enums.UploadState;
+import edu.jhu.cvrg.data.factory.Connection;
 import edu.jhu.cvrg.data.factory.ConnectionFactory;
 import edu.jhu.cvrg.data.util.DataStorageException;
 import edu.jhu.cvrg.waveform.main.UploadManager;
+import edu.jhu.cvrg.waveform.model.FileTreeNode;
 import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 
@@ -288,5 +292,29 @@ public class FileUploadBacking extends BackingBean implements Serializable{
     public boolean isShowBackgroundPanel(){
     	return this.getBackgroundQueue() != null && !this.getBackgroundQueue().isEmpty(); 
     }
+    
+    public void deleteAction(ActionEvent event){
+    	FileTreeNode node = fileTree.getSelectedNode();
+    	
+    	try {
+    		Connection db = ConnectionFactory.createConnection();
+	    	deleteSubNodes(node, db);
+    	} catch (DataStorageException e) {
+			e.printStackTrace();
+		}
+    	fileTree.deleteSelectedNode();
+    	
+    }
+
+	private void deleteSubNodes(FileTreeNode node, Connection db)throws DataStorageException {
+		if(node.isDocument()){
+			db.deleteDocumentRecord(this.getUser().getUserId(), node.getDocumentRecordId());
+		}else{
+			List<TreeNode> children = node.getChildren();
+			for (TreeNode subNode : children) {
+				deleteSubNodes((FileTreeNode)subNode, db);	
+			}
+		}
+	}
 
 }

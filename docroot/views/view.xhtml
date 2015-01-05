@@ -21,7 +21,7 @@
 		                    <p:inputText id="txtFoldername" value="#{fileUploadBacking.fileTree.newFolderName}"/>
 		                    <p:commandButton  id="btnAdd" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.addFolder}" value="New Folder" update="fileTree"/>
 		                    <p:growl id="deletemessage" showDetail="true"/>
-		                    <p:commandButton  id="btnDelete" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.fileTree.deleteFolder}" value="Delete Folder" update="fileTree">
+		                    <p:commandButton  id="btnDelete" icon="ui-icon-folder-open" actionListener="#{fileUploadBacking.deleteAction}" value="Delete" update="fileTree">
 		                    	<p:confirm header="Delete Confirmation" message="Are you sure?" icon="ui-icon-alert"/>
 		                    </p:commandButton>
 		                    
