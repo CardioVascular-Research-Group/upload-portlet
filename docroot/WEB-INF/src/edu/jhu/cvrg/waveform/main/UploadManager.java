@@ -664,7 +664,7 @@ public class UploadManager extends Thread{
 		String recordName = extractRecordName(fileName);
 
 		try {
-			if (!fileTree.fileExistsInFolder(fileName, folderUuid)) {
+			if (!fileTree.fileExistsInFolder(recordName)) {
 				// The new 5th parameter has been added for character encoding,
 				// specifically for XML files. If null is passed in,
 				// the function will use UTF-8 by default
@@ -676,7 +676,7 @@ public class UploadManager extends Thread{
 				}
 
 			} else {
-				throw new UploadFailureException("This file already exists in selected folder.");
+				throw new UploadFailureException("This file already exists.");
 
 			}
 
