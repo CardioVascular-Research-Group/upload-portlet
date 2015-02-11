@@ -63,6 +63,7 @@ import edu.jhu.cvrg.filestore.model.FSFolder;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
 import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
+import edu.jhu.cvrg.waveform.utility.Semaphore;
 import edu.jhu.cvrg.waveform.utility.WebServiceUtility;
 
 public class UploadManager extends Thread{
@@ -102,8 +103,10 @@ public class UploadManager extends Thread{
 			try{
 				if(ecgFile != null && ecgFile.getFile() != null){
 					this.getFileStorer().deleteFile(ecgFile.getFile().getId());
-					if(ecgFile.getPair() != null){
-						this.getFileStorer().deleteFile(ecgFile.getPair().getId());
+					if(ecgFile.getAuxiliarFiles() != null){
+						for (EnumFileExtension extKey : ecgFile.getAuxiliarFiles().keySet()) {
+							this.getFileStorer().deleteFile(ecgFile.getAuxiliarFiles().get(extKey).getId());
+						}
 					}
 				}
 			} catch (FSException e1){
@@ -124,35 +127,50 @@ public class UploadManager extends Thread{
 		
 		String message = null;
 		boolean performConvesion = true;
+		boolean isWFDB = false;
 		
 		
-		if (fileExtension == EnumFileExtension.XML) {
+		if (EnumFileExtension.XML.equals(fileExtension)) {
 			log.info("Processing XML file.");
 			processXMLFileExtension(ecgFile, folderUuid);
 		}
 
-		if (fileExtension == EnumFileExtension.HEA) {
+		if (EnumFileExtension.HEA.equals(fileExtension)) {
 			log.info("Checking HEA file.");
 			checkHeaFile(ecgFile);
+			isWFDB = true;
 		}
 
-		if (fileExtension == EnumFileExtension.DAT) {
+		if (EnumFileExtension.DAT.equals(fileExtension)) {
 			log.info("Checking DAT file.");
 			checkDatFile(ecgFile);
+			isWFDB = true;
+		}
+		
+		if (EnumFileExtension.XYZ.equals(fileExtension)) {
+			log.info("Checking XYZ file.");
+			checkDatFile(ecgFile);
+			isWFDB = true;
 		}
 
 
 
-		if (fileExtension == EnumFileExtension.HEA || fileExtension == EnumFileExtension.DAT) {
-			ecgFile.setFileType(EnumFileType.WFDB);
-			saveFile(ecgFile, folderUuid);
-
+		if (isWFDB) {
 			try {
-				performConvesion = checkWFDBFiles(ecgFile);
+				Semaphore s = Semaphore.getCreateUploadSemaphore();
+				s.take();
+
+				ecgFile.setFileType(EnumFileType.WFDB);
+				this.saveFile(ecgFile, folderUuid, this.getFileStorer());
+				performConvesion = this.checkWFDBFiles(ecgFile, fileExtension, this.getFileStorer());
+				
+				s.release();
+				
 			} catch (FSException e) {
 				log.error("Exception is:", e);
+			} catch (InterruptedException e) {
+				log.error("Exception is:", e);
 			}
-		
 		}
 		if (performConvesion) {
 			validationTime = java.lang.System.currentTimeMillis() - validationTime;
@@ -229,7 +247,7 @@ public class UploadManager extends Thread{
 				ecgFile.setFileType(EnumFileType.HL7);
 			}
 				
-			saveFile(ecgFile, folderUuid);
+			this.saveFile(ecgFile, folderUuid, this.getFileStorer());
 			
 			if(xmlSniffer != null) {
 				xmlSniffer.close();
@@ -348,9 +366,7 @@ public class UploadManager extends Thread{
 		
 	}
 
-	private void saveFile(ECGFile ecgFile, long folderUuid) throws UploadFailureException {
-		
-		FileStorer fileStorer = getFileStorer();
+	private void saveFile(ECGFile ecgFile, long folderUuid, FileStorer fileStorer) throws UploadFailureException {
 		
 		try {
 			FSFolder newRecordFolder = fileStorer.addFolder(folderUuid, ecgFile.getRecordName());
@@ -375,23 +391,77 @@ public class UploadManager extends Thread{
 		return fileStorer;
 	}
 
-	private boolean checkWFDBFiles(ECGFile ecgFile) throws FSException {
+	private boolean checkWFDBFiles(ECGFile ecgFile, EnumFileExtension fileExtension, FileStorer fileStorer) throws FSException {
 		
 		String fileNameToFind = ecgFile.getRecordName();
+		FSFile aux1 = null;
+		FSFile aux2 = null;
+		boolean haveThreeFiles = false;
+		
 		if(EnumFileExtension.HEA.equals(fileExtension)){
-			fileNameToFind += ".dat";
+			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".dat", false);
+			ecgFile.addAuxFile(EnumFileExtension.DAT, aux1);
+			
+			haveThreeFiles = hasXYZ(ecgFile.getFile());
+			
+			if(haveThreeFiles){
+				aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".xyz", false);
+				ecgFile.addAuxFile(EnumFileExtension.XYZ, aux2);
+			}
+			
 		}else if(EnumFileExtension.DAT.equals(fileExtension)){
-			fileNameToFind += ".hea";
+			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".hea", false);
+			ecgFile.addAuxFile(EnumFileExtension.HEA, aux1);
+			
+			haveThreeFiles = aux1 != null && hasXYZ(aux1);
+			
+			if(haveThreeFiles){
+				aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".xyz", false);
+				ecgFile.addAuxFile(EnumFileExtension.XYZ, aux2);
+			}
+			
+		}else if(EnumFileExtension.XYZ.equals(fileExtension)){
+			haveThreeFiles = true;
+			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".hea", false);
+			ecgFile.addAuxFile(EnumFileExtension.HEA, aux1);
+			
+			aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".dat", false);
+			ecgFile.addAuxFile(EnumFileExtension.DAT, aux2);
 		}
 		
-		FileStorer fileStorer = getFileStorer();
-		
-		FSFile pair = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind, false);
-		
-		ecgFile.setPair(pair);	
-		
-		return (ecgFile.getPair() != null);
-		
+		if(haveThreeFiles){
+			return aux1 != null && aux2 != null;
+		}else{
+			return aux1 != null;
+		}
+	}
+
+	private static boolean hasXYZ(FSFile ecgFile) throws FSException{
+		try {
+			boolean hasXYZ = false;
+			
+			if(ecgFile != null){
+				BufferedReader reader = new BufferedReader( new InputStreamReader(new ByteArrayInputStream(ecgFile.getFileDataAsBytes())));
+				
+				String line = null;
+				while((line = reader.readLine()) != null){
+					
+					String[] headerInfo = line.toString().split(" ");
+					
+					if(headerInfo != null){
+						String fileRecordName = headerInfo[0];
+						hasXYZ = fileRecordName.contains(".xyz");
+						if(hasXYZ){
+							break;
+						}
+					}
+				}
+			}
+			
+			return hasXYZ;
+		} catch (IOException e) {
+			throw new FSException("Unable to read header file", e);
+		}
 	}
 
 	public void convertUploadedFile(Connection db) throws UploadFailureException {
@@ -423,11 +493,13 @@ public class UploadManager extends Thread{
 		}
 		
 		if(ecgFile.getFileType() != null){
-			if(EnumFileExtension.HEA.equals(fileExtension) || EnumFileExtension.DAT.equals(fileExtension)) {
+			if(EnumFileExtension.HEA.equals(fileExtension) || EnumFileExtension.DAT.equals(fileExtension) || EnumFileExtension.XYZ.equals(fileExtension)) {
 				
-				FSFile headerFile = ecgFile.getFile();
-				if(EnumFileExtension.DAT.equals(fileExtension)){
-					headerFile = ecgFile.getPair();
+				FSFile headerFile = null;
+				if(EnumFileExtension.HEA.equals(fileExtension)){
+					headerFile = ecgFile.getFile();	
+				}else{
+					headerFile = ecgFile.getAuxiliarFiles().get(EnumFileExtension.HEA);
 				}
 				// Parse the locally held header file
 				correctFormat = checkWFDBHeader(headerFile);
@@ -469,12 +541,23 @@ public class UploadManager extends Thread{
 				
 				switch (fileExtension) {
 				case HEA:
-					filesMap.put("contentFile", ecgFile.getPair());
+					filesMap.put("contentFile", ecgFile.getAuxiliarFiles().get(EnumFileExtension.DAT));
 					filesMap.put("headerFile", ecgFile.getFile());
+					if(ecgFile.getAuxiliarFiles().size() > 1){
+						filesMap.put("extraFile", ecgFile.getAuxiliarFiles().get(EnumFileExtension.XYZ));
+					}
 					break;
 				case DAT:
 					filesMap.put("contentFile", ecgFile.getFile());
-					filesMap.put("headerFile", ecgFile.getPair());
+					filesMap.put("headerFile", ecgFile.getAuxiliarFiles().get(EnumFileExtension.HEA));
+					if(ecgFile.getAuxiliarFiles().size() > 1){
+						filesMap.put("extraFile", ecgFile.getAuxiliarFiles().get(EnumFileExtension.XYZ));
+					}
+					break;
+				case XYZ:
+					filesMap.put("extraFile", ecgFile.getFile());
+					filesMap.put("contentFile", ecgFile.getAuxiliarFiles().get(EnumFileExtension.DAT));
+					filesMap.put("headerFile", ecgFile.getAuxiliarFiles().get(EnumFileExtension.HEA));
 					break;
 				default:
 					filesMap.put("contentFile", ecgFile.getFile());
@@ -664,7 +747,7 @@ public class UploadManager extends Thread{
 		String recordName = extractRecordName(fileName);
 
 		try {
-			if (!fileTree.fileExistsInFolder(recordName)) {
+			if (!fileTree.fileExistsInFolder(fileName)) {
 				// The new 5th parameter has been added for character encoding,
 				// specifically for XML files. If null is passed in,
 				// the function will use UTF-8 by default

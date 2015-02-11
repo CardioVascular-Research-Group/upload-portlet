@@ -196,10 +196,9 @@ public class FileUploadBacking extends BackingBean implements Serializable{
         	try {
 				List<UploadStatusDTO> tmpBackgroundQueue  = ConnectionFactory.createConnection().getUploadStatusByUserAndDocId(userModel.getUserId(), listenIds);
 				if(tmpBackgroundQueue != null){
+					backgroundQueue.removeAll(tmpBackgroundQueue);
 			        for (UploadStatusDTO s : tmpBackgroundQueue) {
-						if(backgroundQueue.contains(s)){
-							backgroundQueue.get(backgroundQueue.indexOf(s)).update(s);
-						}
+						backgroundQueue.add(s);
 					}
 		        }else{
 		        	backgroundQueue.clear();
