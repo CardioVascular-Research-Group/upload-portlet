@@ -153,8 +153,7 @@ public class UploadManager extends Thread{
 			isWFDB = true;
 		}
 
-
-
+		
 		if (isWFDB) {
 			try {
 				Semaphore s = Semaphore.getCreateUploadSemaphore();
@@ -162,7 +161,9 @@ public class UploadManager extends Thread{
 
 				ecgFile.setFileType(EnumFileType.WFDB);
 				this.saveFile(ecgFile, folderUuid, this.getFileStorer());
-				performConvesion = this.checkWFDBFiles(ecgFile, fileExtension, this.getFileStorer());
+				message = this.checkWFDBFiles(ecgFile, fileExtension, this.getFileStorer());
+				
+				performConvesion = (message == null);
 				
 				s.release();
 				
@@ -177,7 +178,9 @@ public class UploadManager extends Thread{
 			this.ecgFile= ecgFile; 
 		} else {
 			validationTime = null;
-			message = "Incomplete ECG, waiting files.";
+			if(message != null){
+				message = "Incomplete ECG, waiting file(s) (" + message + ").";
+			}
 		}
 
 		uploadStatusDTO = new UploadStatusDTO(null, null, null, validationTime,	null, null, message);
@@ -391,49 +394,68 @@ public class UploadManager extends Thread{
 		return fileStorer;
 	}
 
-	private boolean checkWFDBFiles(ECGFile ecgFile, EnumFileExtension fileExtension, FileStorer fileStorer) throws FSException {
+	private String checkWFDBFiles(ECGFile ecgFile, EnumFileExtension fileExtension, FileStorer fileStorer) throws FSException {
 		
 		String fileNameToFind = ecgFile.getRecordName();
 		FSFile aux1 = null;
 		FSFile aux2 = null;
 		boolean haveThreeFiles = false;
 		
+		String ext1 = null;
+		String ext2 = null;
+		String message = null;
+		
 		if(EnumFileExtension.HEA.equals(fileExtension)){
-			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".dat", false);
+			ext1 = ".dat";
+			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ext1, false);
 			ecgFile.addAuxFile(EnumFileExtension.DAT, aux1);
 			
 			haveThreeFiles = hasXYZ(ecgFile.getFile());
 			
 			if(haveThreeFiles){
-				aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".xyz", false);
+				ext2 = ".xyz";
+				aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ext2, false);
 				ecgFile.addAuxFile(EnumFileExtension.XYZ, aux2);
 			}
 			
 		}else if(EnumFileExtension.DAT.equals(fileExtension)){
-			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".hea", false);
+			ext1 = ".hea";
+			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ext1, false);
 			ecgFile.addAuxFile(EnumFileExtension.HEA, aux1);
 			
 			haveThreeFiles = aux1 != null && hasXYZ(aux1);
 			
 			if(haveThreeFiles){
-				aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".xyz", false);
+				ext2 = ".xyz";
+				aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ext2, false);
 				ecgFile.addAuxFile(EnumFileExtension.XYZ, aux2);
 			}
 			
 		}else if(EnumFileExtension.XYZ.equals(fileExtension)){
+			ext1 = ".hea";
 			haveThreeFiles = true;
-			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".hea", false);
+			aux1 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ext1, false);
 			ecgFile.addAuxFile(EnumFileExtension.HEA, aux1);
 			
-			aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ".dat", false);
+			ext2 = ".dat";
+			aux2 = fileStorer.getFileByNameAndFolder(ecgFile.getFile().getParentId(), fileNameToFind + ext2, false);
 			ecgFile.addAuxFile(EnumFileExtension.DAT, aux2);
 		}
 		
-		if(haveThreeFiles){
-			return aux1 != null && aux2 != null;
-		}else{
-			return aux1 != null;
+		
+		if(aux1 == null){
+			message = ext1;
 		}
+		if(haveThreeFiles){
+			if(aux2 == null){
+				if(message != null){
+					message += " and ";
+				}
+				message += ext2;
+			}
+		}
+		
+		return message;
 	}
 
 	private static boolean hasXYZ(FSFile ecgFile) throws FSException{

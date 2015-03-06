@@ -125,6 +125,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 	    			switch (u.getState()) {
 						case ERROR: errorList.add("Error on "+u.getRecordName()+" : " + u.getMessage()); break;
 						case WARN: errorList.add("Annotation extraction error on "+u.getRecordName()+" : " + u.getMessage()); break;
+						case WAIT: errorList.add("Waiting! "+u.getRecordName()+" : " + u.getMessage()); break;
 						default:break;
 					}
 				}
