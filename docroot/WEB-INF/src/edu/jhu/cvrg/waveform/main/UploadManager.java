@@ -453,7 +453,6 @@ public class UploadManager extends Thread{
 				}else{
 					message = ext2;	
 				}
-				
 			}
 		}
 		
