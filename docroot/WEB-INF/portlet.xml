@@ -9,6 +9,11 @@
 			<name>javax.portlet.faces.defaultViewId.view</name>
 			<value>/views/view.xhtml</value>
 		</init-param>
+		<init-param>
+			<name>javax.faces.UPLOADED_FILE_MAX_SIZE</name>
+			<value>-1</value>
+		<!-- 	<bak>218103808</bak> -->
+		</init-param>
 		<expiration-cache>0</expiration-cache>
 		<supports>
 			<mime-type>text/html</mime-type>
