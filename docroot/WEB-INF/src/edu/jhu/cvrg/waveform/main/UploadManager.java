@@ -48,19 +48,20 @@ import com.liferay.portal.security.permission.PermissionThreadLocal;
 import com.liferay.portal.service.UserLocalServiceUtil;
 
 import edu.jhu.cvrg.data.dto.UploadStatusDTO;
+import edu.jhu.cvrg.data.enums.FileType;
 import edu.jhu.cvrg.data.enums.UploadState;
 import edu.jhu.cvrg.data.factory.Connection;
 import edu.jhu.cvrg.data.factory.ConnectionFactory;
 import edu.jhu.cvrg.data.util.DataStorageException;
 import edu.jhu.cvrg.filestore.enums.EnumFileExtension;
-import edu.jhu.cvrg.filestore.enums.EnumFileType;
 import edu.jhu.cvrg.filestore.exception.FSException;
 import edu.jhu.cvrg.filestore.main.FileStoreFactory;
 import edu.jhu.cvrg.filestore.main.FileStorer;
-import edu.jhu.cvrg.filestore.model.ECGFile;
+import edu.jhu.cvrg.filestore.model.ECGFileMeta;
 import edu.jhu.cvrg.filestore.model.FSFile;
 import edu.jhu.cvrg.filestore.model.FSFolder;
 import edu.jhu.cvrg.waveform.exception.UploadFailureException;
+import edu.jhu.cvrg.waveform.model.FileTreeNode;
 import edu.jhu.cvrg.waveform.model.LocalFileTree;
 import edu.jhu.cvrg.waveform.utility.ResourceUtility;
 import edu.jhu.cvrg.waveform.utility.Semaphore;
@@ -72,12 +73,14 @@ public class UploadManager extends Thread{
 	private EnumFileExtension fileExtension;
 	private UploadStatusDTO uploadStatusDTO;
 	private Logger log = Logger.getLogger(UploadManager.class);
-	private ECGFile ecgFile = null;
+	private ECGFileMeta ecgFile = null;
 	
 	private long userId;
 	private long companyId;
 	private long groupId;
 	private FileStorer fileStorer = null;
+	
+	private long virtualNodeId;
 	
 	@Override
 	public void run() {
@@ -115,7 +118,7 @@ public class UploadManager extends Thread{
 		}
 	}
 	
-	public UploadStatusDTO storeUploadedFile(ECGFile ecgFile, long folderUuid) throws UploadFailureException {
+	public UploadStatusDTO storeUploadedFile(ECGFileMeta ecgFile, long folderUuid) throws UploadFailureException {
 	
 		validationTime = java.lang.System.currentTimeMillis();
 		
@@ -143,13 +146,13 @@ public class UploadManager extends Thread{
 
 		if (EnumFileExtension.DAT.equals(fileExtension)) {
 			log.info("Checking DAT file.");
-			checkDatFile(ecgFile);
+			checkBinaryFile(ecgFile);
 			isWFDB = true;
 		}
 		
 		if (EnumFileExtension.XYZ.equals(fileExtension)) {
 			log.info("Checking XYZ file.");
-			checkDatFile(ecgFile);
+			checkBinaryFile(ecgFile);
 			isWFDB = true;
 		}
 
@@ -159,7 +162,7 @@ public class UploadManager extends Thread{
 				Semaphore s = Semaphore.getCreateUploadSemaphore();
 				s.take();
 
-				ecgFile.setFileType(EnumFileType.WFDB);
+				ecgFile.setFileType(FileType.WFDB);
 				this.saveFile(ecgFile, folderUuid, this.getFileStorer());
 				message = this.checkWFDBFiles(ecgFile, fileExtension, this.getFileStorer());
 				
@@ -190,7 +193,7 @@ public class UploadManager extends Thread{
 	}
 		
 	
-	private void processXMLFileExtension(ECGFile ecgFile, long folderUuid){
+	private void processXMLFileExtension(ECGFileMeta ecgFile, long folderUuid){
 		try {
 			SniffedXmlInputStream xmlSniffer = new SniffedXmlInputStream(ecgFile.getFile().getFileDataAsInputStream());
 			
@@ -226,10 +229,10 @@ public class UploadManager extends Thread{
 			
 			if(xmlString.indexOf("restingecgdata") != -1) {				
 				if(xmlString.indexOf("<documentversion>1.03</documentversion>") != -1) {
-					ecgFile.setFileType(EnumFileType.PHILIPS_103);
+					ecgFile.setFileType(FileType.PHILIPS_103);
 				}
 				else if(xmlString.indexOf("<documentversion>1.04</documentversion>") != -1) {
-					ecgFile.setFileType(EnumFileType.PHILIPS_104);
+					ecgFile.setFileType(FileType.PHILIPS_104);
 				}
 				else {
 					if(xmlSniffer != null) {
@@ -240,14 +243,14 @@ public class UploadManager extends Thread{
 			
 			// indicates GE Muse 7
 			}else if(xmlString.indexOf("RestingECG") != -1) {
-				ecgFile.setFileType(EnumFileType.MUSE_XML);
+				ecgFile.setFileType(FileType.MUSE_XML);
 				
 			// indicates Schiller 
 			}else if(xmlString.indexOf("examdescript") != -1) {
-				ecgFile.setFileType(EnumFileType.SCHILLER);
+				ecgFile.setFileType(FileType.SCHILLER);
 			
 			}else{
-				ecgFile.setFileType(EnumFileType.HL7);
+				ecgFile.setFileType(FileType.HL7);
 			}
 				
 			this.saveFile(ecgFile, folderUuid, this.getFileStorer());
@@ -263,7 +266,7 @@ public class UploadManager extends Thread{
 	}
 			
 
-	private void checkDatFile(ECGFile ecgFile) throws UploadFailureException {
+	private void checkBinaryFile(ECGFileMeta ecgFile) throws UploadFailureException {
 		boolean isBinary = false;
 		byte[] fileBytes = ecgFile.getFile().getFileDataAsBytes();
 		int bytesToAnalyze = Double.valueOf(fileBytes.length*0.3).intValue();
@@ -314,7 +317,7 @@ public class UploadManager extends Thread{
 		}
 	}
 
-	private void checkHeaFile(ECGFile ecgFile) throws UploadFailureException {
+	private void checkHeaFile(ECGFileMeta ecgFile) throws UploadFailureException {
 		boolean valid = false;
 		
 		StringBuilder line = new StringBuilder();
@@ -369,11 +372,13 @@ public class UploadManager extends Thread{
 		
 	}
 
-	private void saveFile(ECGFile ecgFile, long folderUuid, FileStorer fileStorer) throws UploadFailureException {
+	private void saveFile(ECGFileMeta ecgFile, long folderUuid, FileStorer fileStorer) throws UploadFailureException {
 		
 		try {
-			FSFolder newRecordFolder = fileStorer.addFolder(folderUuid, ecgFile.getRecordName());
-			FSFile newFile = fileStorer.addFile(newRecordFolder.getId(), ecgFile.getFile().getName(), ecgFile.getFile().getFileDataAsBytes());
+			
+			FSFolder newRecordFolder = fileStorer.addFolder(folderUuid, ecgFile.getRecordName(), ecgFile.isVirtual());
+			
+			FSFile newFile = fileStorer.addFile(newRecordFolder.getId(), ecgFile.getFile().getName(), ecgFile.getFile().getFileDataAsBytes(), ecgFile.isVirtual());
 			
 			ecgFile.setFile(newFile);
 			
@@ -394,7 +399,7 @@ public class UploadManager extends Thread{
 		return fileStorer;
 	}
 
-	private String checkWFDBFiles(ECGFile ecgFile, EnumFileExtension fileExtension, FileStorer fileStorer) throws FSException {
+	private String checkWFDBFiles(ECGFileMeta ecgFile, EnumFileExtension fileExtension, FileStorer fileStorer) throws FSException {
 		
 		String fileNameToFind = ecgFile.getRecordName();
 		FSFile aux1 = null;
@@ -504,7 +509,7 @@ public class UploadManager extends Thread{
 			default:	
 				switch (fileExtension) {
 					case RDT:	method = "rdtToWFDB16";					break;
-					case XYZ:	method = "wfdbToRDT"; 		ecgFile.setFileType(EnumFileType.WFDB);		break;
+					case XYZ:	method = "wfdbToRDT"; 		ecgFile.setFileType(FileType.WFDB);		break;
 					case ZIP:	method = "processUnZipDir";	/* leave the fileFormat tag alone*/ break;
 					case TXT:	method = evaluateTextFile(ecgFile.getFile().getName());	/*currently a stub method -  will eventually process GE MUSE Text files*/	break;
 					case CSV:	method = "xyFile";						break;
@@ -613,6 +618,15 @@ public class UploadManager extends Thread{
 						
 						uploadStatusDTO.setDocumentRecordId(docId);
 						uploadStatusDTO.setTransferReadTime(conversionTime);
+						
+						try {
+							if(ecgFile.isVirtual()){
+								db.storeVirtualDocument(userId, docId, virtualNodeId, ecgFile.getRecordName());
+								db.updateVirtualDocumentReferences(docId, ecgFile.getRecordName());
+							}
+						} catch (DataStorageException e) {
+							throw new UploadFailureException("Unable to persist the shared document record.", e);
+						}
 						
 						try {
 							db.storeUploadStatus(uploadStatusDTO);
@@ -764,7 +778,7 @@ public class UploadManager extends Thread{
 		
 	}
 
-	public void fileUpload(long folderUuid, String fileName, long fileSize, InputStream fileStream, String studyID, String dataType, LocalFileTree fileTree){
+	public void fileUpload(String fileName, long fileSize, InputStream fileStream, String studyID, String dataType, LocalFileTree fileTree){
 
 		UploadStatusDTO status = null;
 		String recordName = extractRecordName(fileName);
@@ -774,9 +788,15 @@ public class UploadManager extends Thread{
 				// The new 5th parameter has been added for character encoding,
 				// specifically for XML files. If null is passed in,
 				// the function will use UTF-8 by default
-				ECGFile ecgFile = createECGFileWrapper(fileStream, fileName,studyID, dataType, recordName, recordName, fileSize, fileTree.getFolderPath(fileTree.getSelectedFolderUuid()));
+				ECGFileMeta ecgFile = createECGFileWrapper(fileStream, fileName,studyID, dataType, recordName, recordName, fileSize, fileTree.getFolderPath(fileTree.getSelectedFolderUuid()), fileTree.getEurekaNode());
 
-				status = storeUploadedFile(ecgFile,	fileTree.getSelectedFolderUuid());
+				long folderUuid = fileTree.getSelectedFolderUuid();
+				if(ecgFile.isVirtual()){
+					virtualNodeId = fileTree.getSelectedFolderUuid();
+					folderUuid = fileTree.getEurekaNode().getUuid();
+				}
+				
+				status = storeUploadedFile(ecgFile,	folderUuid);
 				if (status != null && status.getMessage() == null) {
 					this.start();
 				}
@@ -833,17 +853,23 @@ public class UploadManager extends Thread{
 		session.setAttribute("upload.backgroundQueue", backgroundQueue);
 	}
 
-	private ECGFile createECGFileWrapper(InputStream file, String fileName, String studyID, String dataType, String subjectId, String recordName, long fileSize, String treePath) throws UploadFailureException{
+	private ECGFileMeta createECGFileWrapper(InputStream file, String fileName, String studyID, String dataType, String subjectId, String recordName, long fileSize, String treePath, FileTreeNode eurekaNode) throws UploadFailureException{
 
     	byte[] fileBytes = new byte[(int)fileSize];
 
-    	ECGFile ecgFile = new ECGFile(subjectId, recordName, dataType, studyID);
+    	ECGFileMeta ecgFile = new ECGFileMeta(subjectId, recordName, dataType, studyID);
     	
 		try {
 			file.read(fileBytes);
 			FSFile fileToUpload = new FSFile(0L, fileName, this.getExtesion(fileName), 0L, fileBytes, fileSize);
 			ecgFile.setFile(fileToUpload);
 			ecgFile.setTreePath(treePath);
+			
+			if(treePath != null && eurekaNode != null && treePath.startsWith(eurekaNode.getData().toString())){
+				ecgFile.setVirtual(true);
+				ecgFile.setTreePath(eurekaNode.getData().toString());
+			}
+			
 		} catch (IOException e) {
 			log.error(e.getMessage());
 			throw new UploadFailureException("This upload failed because a " + e.getClass() + " was thrown with the following message:  " + e.getMessage(), e);

@@ -82,8 +82,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
     		fileTree.setDefaultSelected();
     	}
     	
-    	long folderUuid = fileTree.getSelectedFolderUuid();
-		UploadedFile file = event.getFile();
+    	UploadedFile file = event.getFile();
 		String fileName = file.getFileName();
 		fileName = fileName.replaceAll(" ", "_");
 		long fileSize = file.getSize();
@@ -95,7 +94,7 @@ public class FileUploadBacking extends BackingBean implements Serializable{
 			getLog().error("Exception is:", e);
 		}
 		UploadManager uploadManager = new UploadManager();
-    	uploadManager.fileUpload(folderUuid, fileName, fileSize, fileStream, "Mesa", "Rhythm Strips", fileTree);
+    	uploadManager.fileUpload(fileName, fileSize, fileStream, "Mesa", "Rhythm Strips", fileTree);
     	
     }
     
@@ -296,13 +295,34 @@ public class FileUploadBacking extends BackingBean implements Serializable{
     public void deleteAction(ActionEvent event){
     	FileTreeNode node = fileTree.getSelectedNode();
     	
-    	try {
-    		Connection db = ConnectionFactory.createConnection();
-	    	deleteSubNodes(node, db);
-    	} catch (DataStorageException e) {
-			e.printStackTrace();
-		}
-    	fileTree.deleteSelectedNode();
+    	if(!node.equals(fileTree.getMySubjectsNode()) && !node.equals(fileTree.getEurekaNode())){
+	    	try {
+	    		Connection db = ConnectionFactory.createConnection();
+	    		
+	    		switch (node.getFileNode().getStoreStrategy()) {
+				case LIFERAY_61:
+					deleteSubNodes(node, db);
+					break;
+	
+				case VIRTUAL_DB:
+					
+					long nodeId = node.getUuid();
+					if(node.isDocument()){
+						nodeId = node.getFileNode().getParent().getUuid();
+					}
+					
+					db.deleteVirtualNode(this.getUser().getUserId(), nodeId);
+					
+					break;
+				default:
+					
+					break;
+				}
+	    	} catch (DataStorageException e) {
+				e.printStackTrace();
+			}
+	    	fileTree.deleteSelectedNode();
+    	}
     	
     }
 
